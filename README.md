@@ -1,50 +1,63 @@
 # LetsPoly
 
-Interactive Polyhedron Construction — build, fold and print polyhedron templates.
+Interactive polyhedron construction — explore 3D solids, unfold them into 2D nets, and generate printable paper templates.
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+![Explorer — interactive 3D polyhedron](screenshots/01-explorer-3d-model.png)
+
+## Features
+
+- **Explorer** (`/explorer`) — rotate and zoom 3D polyhedra, then unfold them into flat nets.
+- **Generator** (`/generator`) — choose a solid, tune its net, and produce a printable template.
+- **Report widget** — the floating button (bottom-right) emails anonymous bug reports / feedback to the maintainer through this app's own serverless route.
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-## One-Click Setup for Windows
-
-If you are on Windows, run the helper script from the project root:
+On Windows you can also run the helper script, which installs dependencies and starts the dev server:
 
 ```powershell
 ./run-dev.ps1
 ```
 
-This will install dependencies and then start the development server.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Script | Purpose |
+| --- | --- |
+| `npm run dev` | Dev server (webpack) writing to `.next` |
+| `npm run build` | Production build → `.next-build` locally, `.next` on Vercel |
+| `npm start` | Serve the production build |
+| `npm run lint` | ESLint |
 
-## Learn More
+The dev/production output folders are kept separate (`next.config.ts`) so a production build can never corrupt a running dev server's `.next` cache.
 
-To learn more about Next.js, take a look at the following resources:
+## Anonymous report emails
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`POST /api/report` (`app/api/report/route.ts`) validates the message, silently drops honeypot spam, applies a light per-IP rate limit (5 reports / 10 minutes) and sends the email through [Resend](https://resend.com) **server-side**, so the API key is never exposed to the browser.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Environment variables — copy `.env.example` to `.env.local` for local testing and add the same keys in Vercel for production. The inbox address is **not** committed to the repo, so it lives only in these variables:
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `RESEND_API_KEY` | yes | Resend API key (`re_...`) |
+| `REPORT_TO_EMAIL` | yes | Inbox that receives the reports |
+| `REPORT_FROM` | no | `From` header (default `LetsPoly Reports <onboarding@resend.dev>`) |
+| `NEXT_PUBLIC_SUPPORT_EMAIL` | no | Address shown in the browser's “or email us” fallback link; unset = link hidden |
 
 ## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The app is a standard Next.js project, so Vercel needs no extra configuration:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Go to [vercel.com/new](https://vercel.com/new) and import `Afifah1924/LetsPoly` (the framework is detected automatically).
+2. Add the environment variables above to **Production** and **Preview**.
+3. Deploy — every `git push` to `main` then ships automatically, and each PR gets a preview URL.
+
+Resend sandbox note: while sending from `onboarding@resend.dev`, mail is only delivered to the Resend account owner's address. Verify a domain in Resend to send from `@yourdomain` to any recipient.
+
+> This project previously deployed to GitHub Pages through a static export. That workflow was removed because a static export cannot host server-side routes such as `/api/report`.
+

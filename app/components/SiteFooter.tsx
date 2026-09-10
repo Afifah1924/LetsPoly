@@ -3,9 +3,11 @@
 import { useRef, useState } from "react";
 
 /**
- * Support email for bug reports / feedback.
+ * Optional support address for the "email us instead" fallback.
+ * Comes from NEXT_PUBLIC_SUPPORT_EMAIL so the real inbox is not committed to
+ * the public repo; when unset, the fallback link is simply hidden.
  */
-const SUPPORT_EMAIL = "afifahakram.aa@gmail.com";
+const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "";
 
 function BugIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
@@ -60,6 +62,9 @@ function ReportBugButton() {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [errorText, setErrorText] = useState("");
+  // Honeypot: invisible to humans; bots that fill it are silently ignored.
+  const [honeypot, setHoneypot] = useState("");
   const [hearts, setHearts] = useState<
     Array<{ id: number; left: number; delay: number; size: number; duration: number }>
   >([]);
@@ -105,40 +110,34 @@ function ReportBugButton() {
   };
 
   /**
-   * Send the report anonymously via an AJAX mail relay — the visitor never
-   * leaves the page and no personal details are collected.
-   * NOTE: formsubmit.co requires a one-time activation click sent to the
-   * support inbox on the very first submission.
+   * Send the report anonymously through our own `/api/report` serverless route
+   * (Resend, server-side API key). The visitor never leaves the page and no
+   * third-party relay sees the message.
    */
   const sendReport = async () => {
     const text = message.trim();
     if (!text || status === "sending") return;
     setStatus("sending");
+    setErrorText("");
     try {
-      const res = await fetch(`https://formsubmit.co/ajax/${SUPPORT_EMAIL}`, {
+      const res = await fetch("/api/report", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          _subject: "[LetsPoly Beta] Bug report / feedback",
-          _template: "table",
-          _captcha: "false",
+          message: text,
           page: typeof window !== "undefined" ? window.location.href : "",
-          report: text,
+          company: honeypot,
         }),
       });
-      const data = (await res.json().catch(() => null)) as
-        | { success?: boolean | string; message?: string }
-        | null;
-      const delivered =
-        res.ok && (data?.success === true || data?.success === "true");
-      if (!delivered) {
-        throw new Error(
-          typeof data?.message === "string" ? data.message : `Request failed: ${res.status}`
-        );
+      const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || `Request failed: ${res.status}`);
       }
       setStatus("sent");
       setMessage("");
-    } catch {
+      setHoneypot("");
+    } catch (err) {
+      setErrorText(err instanceof Error ? err.message : "Something went wrong.");
       setStatus("error");
     }
   };
@@ -174,6 +173,19 @@ function ReportBugButton() {
           </div>
 
           <div className="space-y-3 p-4">
+            {/* Honeypot — hidden from humans, filled by bots (server ignores those). */}
+            <div aria-hidden="true" className="pointer-events-none absolute -left-[9999px] h-0 w-0 overflow-hidden">
+              <label htmlFor="report-company">Company</label>
+              <input
+                id="report-company"
+                name="company"
+                type="text"
+                tabIndex={-1}
+                autoComplete="off"
+                value={honeypot}
+                onChange={(event) => setHoneypot(event.target.value)}
+              />
+            </div>
             <textarea
               value={message}
               onChange={(event) => setMessage(event.target.value)}
@@ -188,6 +200,8 @@ function ReportBugButton() {
                   setOpen(false);
                   setMessage("");
                   setStatus("idle");
+                  setErrorText("");
+                  setHoneypot("");
                 }}
                 className="rounded-full border border-slate-800 px-4 py-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-400 transition hover:border-slate-600 hover:text-white"
               >
@@ -210,11 +224,18 @@ function ReportBugButton() {
             )}
             {status === "error" && (
               <p className="rounded-2xl border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-[11px] leading-relaxed text-rose-200">
-                Couldn&apos;t send right now. Try again in a moment, or email{" "}
-                <a className="underline" href={`mailto:${SUPPORT_EMAIL}`}>
-                  {SUPPORT_EMAIL}
-                </a>
-                .
+                {errorText ? `${errorText} ` : "Couldn\u2019t send right now. "}
+                {SUPPORT_EMAIL ? (
+                  <>
+                    {"You can also email "}
+                    <a className="underline" href={`mailto:${SUPPORT_EMAIL}`}>
+                      {SUPPORT_EMAIL}
+                    </a>
+                    .
+                  </>
+                ) : (
+                  "Please try again in a moment."
+                )}
               </p>
             )}
             <div className="flex items-center justify-between gap-3 border-t border-slate-800/80 pt-3">

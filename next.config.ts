@@ -1,32 +1,17 @@
 import type { NextConfig } from "next";
 
 /**
- * Keep the production build output separate from the dev server cache.
- *
- * Root cause of the earlier dev failures: `next build` wrote into the same
- * `.next` folder a running `next dev` server was reading, which corrupted its
- * manifests ("Unexpected end of JSON input" in loadManifest) and produced
- * HTTP 500s + "unrecoverable error" full reloads until `.next` was cleared.
- * Dev uses `.next`; production build/start use `.next-build`.
- *
- * `GITHUB_PAGES=true` produces a fully static export in `out/` for GitHub
- * Pages (project site is served from /<repo>/, hence the basePath).
+ * Build-output routing:
+ *  - Vercel (process.env.VERCEL) uses the default `.next` so the platform picks
+ *    up the build normally, and serverless routes in `app/api/**` are supported.
+ *  - Locally, a production build goes to `.next-build` so it can never corrupt
+ *    the `.next` folder a running `next dev` server is reading (that collision
+ *    previously produced HTTP 500s + "unrecoverable error" full reloads).
  */
-const isPages = process.env.GITHUB_PAGES === "true";
+const onVercel = Boolean(process.env.VERCEL);
 
 const nextConfig: NextConfig = {
-  // With `output: "export"` Next writes the static site into `distDir`, so the
-  // Pages build targets `out/` (conventional, and what the workflow uploads).
-  distDir: isPages ? "out" : process.env.NODE_ENV === "production" ? ".next-build" : ".next",
-  ...(isPages
-    ? {
-        output: "export" as const,
-        basePath: "/LetsPoly",
-        assetPrefix: "/LetsPoly/",
-        trailingSlash: true,
-        images: { unoptimized: true },
-      }
-    : {}),
+  distDir: onVercel ? ".next" : process.env.NODE_ENV === "production" ? ".next-build" : ".next",
 };
 
 export default nextConfig;
