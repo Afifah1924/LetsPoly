@@ -150,7 +150,7 @@ function ReportBugButton() {
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? "Close report panel" : "Report a bug"}
         title="Report a bug or give feedback"
-        className="fixed bottom-5 right-5 z-50 grid h-12 w-12 place-items-center rounded-full bg-gradient-to-br from-teal-400 to-emerald-500 text-slate-950 shadow-lg shadow-teal-500/25 transition hover:scale-105 hover:shadow-teal-400/40"
+        className="fixed bottom-4 right-4 z-50 grid h-14 w-14 touch-manipulation place-items-center rounded-full bg-gradient-to-br from-teal-400 to-emerald-500 text-slate-950 shadow-lg shadow-teal-500/25 transition hover:scale-105 hover:shadow-teal-400/40 sm:bottom-5 sm:right-5 sm:h-12 sm:w-12"
       >
         {open ? (
           <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -162,7 +162,7 @@ function ReportBugButton() {
       </button>
 
       {open && (
-        <div className="fixed bottom-20 right-5 z-50 w-[min(21rem,calc(100vw-2.5rem))] overflow-hidden rounded-3xl border border-slate-700/70 bg-slate-950/95 shadow-2xl shadow-black/50 backdrop-blur">
+        <div className="fixed bottom-20 right-4 z-50 max-h-[calc(100svh-7rem)] w-[min(21rem,calc(100vw-2rem))] overflow-y-auto overscroll-contain rounded-3xl border border-slate-700/70 bg-slate-950/95 shadow-2xl shadow-black/50 backdrop-blur sm:right-5">
           <div className="border-b border-slate-800/80 bg-gradient-to-br from-teal-400/10 to-emerald-500/5 px-5 py-4">
             <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.25em] text-teal-300">
               <BugIcon /> Report bug / feedback
@@ -203,7 +203,7 @@ function ReportBugButton() {
                   setErrorText("");
                   setHoneypot("");
                 }}
-                className="rounded-full border border-slate-800 px-4 py-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-400 transition hover:border-slate-600 hover:text-white"
+                className="min-h-10 touch-manipulation rounded-full border border-slate-800 px-4 py-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-400 transition hover:border-slate-600 hover:text-white"
               >
                 Cancel
               </button>
@@ -211,7 +211,7 @@ function ReportBugButton() {
                 type="button"
                 onClick={sendReport}
                 disabled={!message.trim() || status === "sending"}
-                className="rounded-full bg-gradient-to-r from-teal-400 to-emerald-500 px-5 py-2 text-xs font-bold uppercase tracking-[0.15em] text-slate-950 transition enabled:hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                className="min-h-10 touch-manipulation rounded-full bg-gradient-to-r from-teal-400 to-emerald-500 px-5 py-2 text-xs font-bold uppercase tracking-[0.15em] text-slate-950 transition enabled:hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {status === "sending" ? "Sending…" : "Send report"}
               </button>
@@ -244,7 +244,7 @@ function ReportBugButton() {
                 onClick={showLove}
                 title="Leave your mark"
                 aria-label="Leave your mark"
-                className="group inline-flex items-center gap-2 rounded-full border border-rose-500/30 bg-rose-500/5 px-3.5 py-1.5 text-xs font-semibold text-rose-200 transition hover:border-rose-400/60 hover:bg-rose-500/10"
+                className="group inline-flex min-h-10 touch-manipulation items-center gap-2 rounded-full border border-rose-500/30 bg-rose-500/5 px-3.5 py-1.5 text-xs font-semibold text-rose-200 transition hover:border-rose-400/60 hover:bg-rose-500/10"
               >
                 <HeartIcon className="h-4 w-4 text-rose-400 transition group-hover:scale-110" />
                 <span>{heartCount}</span>

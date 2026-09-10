@@ -37,6 +37,13 @@ On Windows you can also run the helper script, which installs dependencies and s
 
 The dev/production output folders are kept separate (`next.config.ts`) so a production build can never corrupt a running dev server's `.next` cache.
 
+## Mobile & touch
+
+- **One finger drag rotates** the model; **two fingers pinch to zoom**. The 3D stage sets `touch-action: none`, so the page never scrolls away while you drag (this was the "can't rotate on a phone" bug — without it the browser claims the gesture and fires `pointercancel`).
+- Below the `xl` breakpoint the layout stacks and reorders: a **sticky shape picker** (`/`), then the live preview, then the structure info. The full structures list is desktop-only.
+- All controls are at least **40px** tall, and the fold slider has a 40px touch area.
+- The `?` badge next to the preview toggles a gesture cheat-sheet (it is tappable, not hover-only).
+
 ## Anonymous report emails
 
 `POST /api/report` (`app/api/report/route.ts`) validates the message, silently drops honeypot spam, applies a light per-IP rate limit (5 reports / 10 minutes) and sends the email through [Resend](https://resend.com) **server-side**, so the API key is never exposed to the browser.

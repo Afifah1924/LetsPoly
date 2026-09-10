@@ -48,6 +48,10 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const draggingRef = useRef(false);
   const dragStartRef = useRef({ x: 0, y: 0, rotateX: 0, rotateY: 0, offsetX: 0, offsetY: 0 });
+  // Live pointers on the drag surface: a second finger switches to pinch-zoom.
+  const pointersRef = useRef(new Map<number, { x: number; y: number }>());
+  const pinchRef = useRef<{ distance: number; zoom: number } | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   // React's onWheel is a passive listener, so preventDefault silently fails.
   // Attach a native, non-passive listener so "scroll to zoom" doesn't also scroll the page.
@@ -96,15 +100,35 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
     : 0;
   const modelScale = useMemo(() => Math.min(1.6, 0.8 + height / 180), [height]);
 
+  /** The surface only captures gestures while a rotatable 3D view is showing. */
+  const canRotate = viewMode === "3d" || (viewMode === "transition" && transitionStep === 1);
+
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     // Don't hijack clicks on interactive controls (e.g. the STEP / mode pills that
     // live inside this drag surface). setPointerCapture() on pointer-down retargets
     // the pointer so the button's click event never fires -> preview "gets stuck".
-    if (event.button !== 0) return;
     const target = event.target as HTMLElement | null;
-    if (target && typeof target.closest === "function" && target.closest("button, a, input, select, textarea, label")) {
+    const onControl =
+      !!target &&
+      typeof target.closest === "function" &&
+      !!target.closest("button, a, input, select, textarea, label");
+    if (onControl) return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    if (!canRotate) return;
+
+    setHelpOpen(false);
+    pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    event.currentTarget.setPointerCapture(event.pointerId);
+
+    // A second finger on the surface switches to pinch-to-zoom.
+    if (pointersRef.current.size >= 2) {
+      const [first, second] = [...pointersRef.current.values()];
+      const distance = Math.hypot(first.x - second.x, first.y - second.y) || 1;
+      pinchRef.current = { distance, zoom };
+      draggingRef.current = false;
       return;
     }
+
     draggingRef.current = true;
     dragStartRef.current = {
       x: event.clientX,
@@ -114,13 +138,25 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
       offsetX: offset.x,
       offsetY: offset.y,
     };
-    event.currentTarget.setPointerCapture(event.pointerId);
   };
 
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!pointersRef.current.has(event.pointerId)) return;
+    pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+    // Two fingers down: pinch scales the model instead of rotating it.
+    const pinch = pinchRef.current;
+    if (pinch && pointersRef.current.size >= 2) {
+      const [first, second] = [...pointersRef.current.values()];
+      const distance = Math.hypot(first.x - second.x, first.y - second.y) || 1;
+      setZoom(Math.max(0.65, Math.min(1.8, pinch.zoom * (distance / pinch.distance))));
+      return;
+    }
+
     if (!draggingRef.current) return;
     const dx = event.clientX - dragStartRef.current.x;
     const dy = event.clientY - dragStartRef.current.y;
+    // Shift + drag (mouse) pans the model; a plain drag / one finger rotates it.
     if (event.shiftKey) {
       setOffset({
         x: dragStartRef.current.offsetX + dx,
@@ -132,23 +168,25 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
     }
   };
 
-  const handlePointerUp = () => {
-    draggingRef.current = false;
+  const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    pointersRef.current.delete(event.pointerId);
+    if (pointersRef.current.size < 2) pinchRef.current = null;
+    if (pointersRef.current.size === 0) draggingRef.current = false;
   };
 
   return (
 
         <div className="space-y-6">
-          <div className="rounded-[2rem] border border-slate-800 bg-slate-900/90 p-6 shadow-xl">
+          <div className="rounded-[2rem] border border-slate-800 bg-slate-900/90 p-4 shadow-xl sm:p-6">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <p className="text-xs uppercase tracking-[0.35em] text-teal-300">Live model preview</p>
                   <h2 className="mt-3 text-3xl font-semibold text-white">Interactive 3D Preview</h2>
 
-                  <div className="mt-4 flex gap-2">
+                  <div className="mt-4 flex flex-wrap gap-2">
                     <button
                       onClick={() => setViewMode("3d")}
-                      className={`rounded-full px-4 py-2 transition ${
+                      className={`min-h-10 touch-manipulation rounded-full px-4 py-2 transition ${
                         viewMode === "3d"
                           ? "bg-teal-400 text-slate-950"
                           : "bg-slate-800 text-slate-300 hover:bg-slate-700"
@@ -159,7 +197,7 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
 
                     <button
                       onClick={() => setViewMode("transition")}
-                      className={`rounded-full px-4 py-2 transition ${
+                      className={`min-h-10 touch-manipulation rounded-full px-4 py-2 transition ${
                         viewMode === "transition"
                           ? "bg-teal-400 text-slate-950"
                           : "bg-slate-800 text-slate-300 hover:bg-slate-700"
@@ -170,7 +208,7 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
 
                     <button
                       onClick={() => setViewMode("net")}
-                      className="rounded-full bg-slate-800 px-4 py-2 text-slate-300 transition hover:bg-slate-700"
+                      className="min-h-10 touch-manipulation rounded-full bg-slate-800 px-4 py-2 text-slate-300 transition hover:bg-slate-700"
                     >
                       2D Net
                     </button>
@@ -187,7 +225,7 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
                             setUnit(u);
                             setHeightText(formatHeightInput(height, u));
                           }}
-                          className={`px-3 py-1 text-xs uppercase transition ${
+                          className={`min-h-10 touch-manipulation px-3 py-1.5 text-xs uppercase transition ${
                             unit === u ? "bg-teal-400 text-slate-950" : "bg-slate-950 text-slate-400 hover:text-white"
                           }`}
                         >
@@ -203,7 +241,7 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
                   onClick={() => setAutoRotate((v) => !v)}
                   title={autoRotate ? "Stop 360° rotation" : "Start 360° auto rotation"}
                   aria-pressed={autoRotate}
-                  className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] transition ${
+                  className={`inline-flex min-h-10 touch-manipulation items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] transition ${
                     autoRotate
                       ? "border-teal-400/60 bg-teal-400/10 text-teal-200"
                       : "border-slate-800 bg-slate-950 text-slate-300 hover:border-teal-300 hover:text-white"
@@ -230,11 +268,12 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
               <div
                 ref={viewportRef}
                 className={`relative overflow-hidden rounded-[1.75rem] border border-slate-800 bg-slate-950 ${
-                  viewMode === "net" ? "min-h-[70vh]" : "aspect-[16/10]"
-                }`}
+                  viewMode === "net" ? "min-h-[70svh]" : "aspect-square sm:aspect-[16/10]"
+                } ${canRotate ? "touch-none select-none" : ""}`}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerUp}
                 onPointerLeave={handlePointerUp}
               >
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(45,212,191,0.14),_transparent_40%),linear-gradient(rgba(148,163,184,0.08)_1px,_transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.08)_1px,_transparent_1px)] bg-[length:80px_80px]" />
@@ -244,13 +283,22 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
                     <div className="group relative">
                       <button
                         type="button"
+                        onClick={() => setHelpOpen((v) => !v)}
                         aria-label="Preview controls help"
-                        className="grid h-7 w-7 cursor-help place-items-center rounded-full border border-slate-700 bg-slate-950/90 text-xs font-semibold text-slate-300 transition hover:border-teal-300 hover:text-teal-200"
+                        aria-expanded={helpOpen}
+                        className="grid h-10 w-10 cursor-help touch-manipulation place-items-center rounded-full border border-slate-700 bg-slate-950/90 text-xs font-semibold text-slate-300 transition hover:border-teal-300 hover:text-teal-200"
                       >
                         ?
                       </button>
-                      <div className="pointer-events-none absolute left-0 top-9 z-20 hidden whitespace-nowrap rounded-xl border border-slate-700 bg-slate-950/95 px-3 py-2 text-[11px] leading-relaxed text-slate-300 shadow-2xl group-hover:block">
-                        Drag to rotate · Shift + drag to pan · scroll to zoom
+                      <div
+                        className={`pointer-events-none absolute left-0 top-10 z-20 w-56 rounded-xl border border-slate-700 bg-slate-950/95 px-3 py-2 text-[11px] leading-relaxed text-slate-300 shadow-2xl sm:w-max ${
+                          helpOpen ? "block" : "hidden"
+                        } group-hover:block`}
+                      >
+                        <span className="block font-semibold text-teal-200">Touch</span>
+                        Drag to rotate · pinch to zoom.
+                        <span className="mt-1 block font-semibold text-teal-200">Desktop</span>
+                        Drag to rotate · Shift + drag to pan · scroll to zoom.
                       </div>
                     </div>
                   </div>
@@ -286,7 +334,7 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
                       {transitionStep === 2 && <PartialFoldStage selected={selected} modelScale={modelScale} />}
                       {transitionStep === 3 && <PolyhedronNet mode="clean" selected={selected} height={height} unit={unit} />}
                     </div>
-                    <div className="flex items-center justify-center gap-2 pb-3 pt-2">
+                    <div className="flex flex-wrap items-center justify-center gap-2 px-2 pb-3 pt-2">
                       {[
                         { step: 1, label: "3D Model" },
                         { step: 2, label: "Partial Fold" },
@@ -295,11 +343,11 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
                         const active = transitionStep === s.step;
                         return (
                           <div key={s.step} className="flex items-center gap-2">
-                            {i > 0 && <div className="h-px w-6 bg-slate-700" />}
+                            {i > 0 && <div className="hidden h-px w-6 shrink-0 bg-slate-700 sm:block" />}
                             <button
                               type="button"
                               onClick={() => setTransitionStep(s.step)}
-                              className={`rounded-full px-4 py-2 text-xs uppercase tracking-[0.2em] transition ${
+                              className={`min-h-10 touch-manipulation rounded-full px-4 py-2 text-xs uppercase tracking-[0.2em] transition ${
                                 active ? "bg-teal-400 text-slate-950" : "bg-slate-800 text-slate-300 hover:bg-slate-700"
                               }`}
                             >
@@ -313,14 +361,14 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
                 )}
 
                 {viewMode === "net" && (
-                  <div className="absolute inset-0 overflow-y-auto p-6">
+                  <div className="absolute inset-0 overflow-auto overscroll-contain p-4 sm:p-6">
 <PolyhedronNet selected={selected} height={height} unit={unit} />
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="mt-6 grid gap-4 rounded-[1.75rem] border border-slate-800 bg-slate-950/80 p-6 text-sm text-slate-300">
+            <div className="mt-6 grid gap-4 rounded-[1.75rem] border border-slate-800 bg-slate-950/80 p-4 text-sm text-slate-300 sm:p-6">
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="space-y-2 text-slate-300">
                   <span className="text-xs uppercase tracking-[0.35em] text-slate-500">Height (net) ({unit})</span>
@@ -419,7 +467,7 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
                       key={p}
                       type="button"
                       onClick={() => setPaper(p)}
-                      className={`px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition ${
+                      className={`min-h-10 touch-manipulation px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition ${
                         paper === p
                           ? "bg-teal-400 text-slate-950"
                           : "bg-slate-950 text-slate-400 hover:text-white"

@@ -127,23 +127,60 @@ const structureDetails: Record<string, { name: string; category: string; faces: 
 export default function ExplorerPage() {
   const [activeShape, setActiveShape] = useState("Icosahedron");
   const selectedStructure = structureDetails[activeShape];
+  const structureStats = [
+    { label: "Name", value: selectedStructure.name },
+    { label: "Category", value: selectedStructure.category },
+    { label: "Faces", value: String(selectedStructure.faces) },
+    { label: "Vertices", value: String(selectedStructure.vertices) },
+    { label: "Edges", value: String(selectedStructure.edges) },
+    { label: "Symmetry", value: selectedStructure.symmetry },
+  ];
+  const allShapes = structureSections.flatMap((section) => section.items);
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
       <header className="border-b border-slate-800">
-        <div className="mx-auto flex w-full max-w-[min(90vw,1600px)] items-center justify-between px-6 py-5">
-          <div>
-            <h1 className="font-[family-name:var(--font-space-grotesk)] text-3xl font-bold tracking-tight text-white">
+        <div className="mx-auto flex w-full max-w-[min(90vw,1600px)] items-center justify-between gap-3 px-4 py-4 sm:px-6 sm:py-5">
+          <div className="min-w-0">
+            <h1 className="font-[family-name:var(--font-space-grotesk)] text-2xl font-bold tracking-tight text-white sm:text-3xl">
               Lets<span className="text-teal-300">Poly</span>
             </h1>
-            <p className="mt-1.5 text-xs uppercase tracking-[0.35em] text-slate-500">
+            <p className="mt-1.5 text-[10px] uppercase tracking-[0.2em] text-slate-500 sm:text-xs sm:tracking-[0.35em]">
               Interactive Polyhedron Construction
             </p>
           </div>
+          <span className="hidden shrink-0 rounded-full border border-slate-800 bg-slate-950 px-3 py-1.5 text-[11px] font-medium text-teal-200 sm:inline-flex">
+            {activeShape}
+          </span>
         </div>
       </header>
-      <section className="mx-auto grid w-full max-w-[min(90vw,1600px)] gap-6 px-6 py-10 xl:grid-cols-[2fr_6fr_2fr]">
-        <aside className="space-y-6 rounded-[2rem] border border-slate-800 bg-slate-900/80 p-6 shadow-xl">
+
+      {/* Mobile / tablet shape picker — sticky so it is reachable while scrolling. */}
+      <div className="sticky top-0 z-30 border-b border-slate-800/70 bg-slate-950/95 backdrop-blur xl:hidden">
+        <div className="no-scrollbar flex gap-2 overflow-x-auto px-4 py-3 sm:px-6">
+          {allShapes.map((shape) => {
+            const active = activeShape === shape.name;
+            return (
+              <button
+                key={shape.name}
+                type="button"
+                onClick={() => setActiveShape(shape.name)}
+                aria-pressed={active}
+                className={`min-h-10 shrink-0 touch-manipulation rounded-full border px-4 text-sm transition ${
+                  active
+                    ? "border-teal-400 bg-teal-400/10 font-semibold text-teal-200"
+                    : "border-slate-800 bg-slate-900/70 text-slate-300"
+                }`}
+              >
+                {shape.name}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <section className="mx-auto grid w-full max-w-[min(90vw,1600px)] gap-6 px-4 py-6 sm:px-6 sm:py-10 xl:grid-cols-[2fr_6fr_2fr]">
+        <aside className="hidden space-y-6 rounded-[2rem] border border-slate-800 bg-slate-900/80 p-6 shadow-xl xl:order-1 xl:block">
           <div>
             <p className="text-xs uppercase tracking-[0.35em] text-teal-300">STRUCTURES</p>
             <h2 className="mt-3 text-xl font-semibold text-white">Navigation</h2>
@@ -180,38 +217,27 @@ export default function ExplorerPage() {
             </div>
           ))}
         </aside>
-        <GeneratorPanel selected={activeShape} />
-        <aside className="space-y-6 rounded-[2rem] border border-slate-800 bg-slate-900/80 p-6 shadow-xl">
+        <div className="order-1 min-w-0 xl:order-2">
+          <GeneratorPanel selected={activeShape} />
+        </div>
+        <aside className="order-2 rounded-[2rem] border border-slate-800 bg-slate-900/80 p-4 shadow-xl sm:p-6 xl:order-3">
           <div>
             <p className="text-xs uppercase tracking-[0.35em] text-teal-300">STRUCTURE INFO</p>
             <h2 className="mt-3 text-xl font-semibold text-white">{selectedStructure.name}</h2>
           </div>
 
-          <div className="space-y-4 rounded-3xl border border-slate-800 bg-slate-950/80 p-5 text-sm text-slate-300">
-            <div className="flex justify-between">
-              <span className="text-slate-500">Name</span>
-              <span className="font-medium text-white">{selectedStructure.name}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Category</span>
-              <span className="font-medium text-white">{selectedStructure.category}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Faces</span>
-              <span className="font-medium text-white">{selectedStructure.faces}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Vertices</span>
-              <span className="font-medium text-white">{selectedStructure.vertices}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Edges</span>
-              <span className="font-medium text-white">{selectedStructure.edges}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-500">Symmetry</span>
-              <span className="font-medium text-white">{selectedStructure.symmetry}</span>
-            </div>
+          <div className="mt-6 grid grid-cols-2 gap-3 text-sm text-slate-300 sm:grid-cols-1 sm:gap-0 sm:divide-y sm:divide-slate-800">
+            {structureStats.map((stat) => (
+              <div
+                key={stat.label}
+                className="flex flex-col gap-1 rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:rounded-none sm:border-0 sm:bg-transparent sm:px-0"
+              >
+                <span className="text-[11px] uppercase tracking-[0.2em] text-slate-500 sm:text-sm sm:normal-case sm:tracking-normal">
+                  {stat.label}
+                </span>
+                <span className="font-medium text-white">{stat.value}</span>
+              </div>
+            ))}
           </div>
         </aside>
       </section>

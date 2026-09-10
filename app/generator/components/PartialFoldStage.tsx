@@ -76,7 +76,7 @@ export default function PartialFoldStage({ selected, modelScale }: PartialFoldSt
 
   return (
     <div className="absolute inset-0 flex flex-col">
-      <div className="relative min-h-0 flex-1">
+      <div className="relative min-h-0 flex-1 touch-none select-none">
         <PartialFoldViewer selected={selected} modelScale={modelScale} progress={progressRef} />
       </div>
 
@@ -85,7 +85,7 @@ export default function PartialFoldStage({ selected, modelScale }: PartialFoldSt
           type="button"
           onClick={() => setPlaying((v) => !v)}
           aria-label={playing ? "Pause fold animation" : "Play fold animation"}
-          className="inline-flex items-center gap-2 rounded-full bg-teal-400 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-950 transition hover:bg-teal-300"
+          className="inline-flex min-h-10 touch-manipulation items-center gap-2 rounded-full bg-teal-400 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-950 transition hover:bg-teal-300"
         >
           <span aria-hidden>{playing ? "❚❚" : "▶"}</span>
           {playing ? "Pause" : "Play"}
@@ -103,7 +103,7 @@ export default function PartialFoldStage({ selected, modelScale }: PartialFoldSt
             onChange={handleSeek}
             aria-label="Fold progress"
             title="Drag to scrub through the fold"
-            className="h-2 flex-1 accent-teal-400"
+            className="h-10 flex-1 touch-manipulation accent-teal-400"
           />
           <span className="shrink-0 text-[10px] uppercase tracking-[0.2em] text-slate-500">Flat</span>
         </div>

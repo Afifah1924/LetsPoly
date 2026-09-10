@@ -23,6 +23,34 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---------- Mobile / touch ---------- */
+
+/* Stop iOS from inflating text in landscape. */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+/*
+ * three.js / react-three-fiber canvases must own the gesture. Without this the
+ * browser treats a one-finger drag as a page scroll and fires `pointercancel`,
+ * which is why the model could not be rotated on phones/tablets.
+ */
+canvas {
+  display: block;
+  touch-action: none;
+}
+
+/* Horizontally scrollable chip strips on small screens, without a scrollbar. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 /* Anonymous "show some love" heart burst (report panel). */
