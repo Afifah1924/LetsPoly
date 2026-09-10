@@ -6,8 +6,8 @@ Interactive polyhedron construction — explore 3D solids, unfold them into 2D n
 
 ## Features
 
-- **Explorer** (`/explorer`) — rotate and zoom 3D polyhedra, then unfold them into flat nets.
-- **Generator** (`/generator`) — choose a solid, tune its net, and produce a printable template.
+- **Home** (`/`) — landing page.
+- **Explorer** (`/explorer`) — rotate and zoom 3D polyhedra, play the fold/unfold transition, and use the net panel (the `app/generator/components/*` pieces) to pick a solid, size the template and print it.
 - **Report widget** — the floating button (bottom-right) emails anonymous bug reports / feedback to the maintainer through this app's own serverless route.
 
 ## Getting Started
