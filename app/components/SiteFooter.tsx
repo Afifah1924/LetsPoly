@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * Optional support address for the "email us instead" fallback.
@@ -8,6 +8,31 @@ import { useRef, useState } from "react";
  * the public repo; when unset, the fallback link is simply hidden.
  */
 const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "";
+
+/** localStorage keys for the anonymous heart counter. */
+const ANON_ID_KEY = "letspoly_anon_id";
+const HEART_GIVEN_KEY = "letspoly_heart_given";
+const LOCAL_COUNT_KEY = "letspoly_likes";
+const ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
+
+/**
+ * Stable random id for this browser — no personal data, just something the
+ * server can de-duplicate on so one visitor counts once.
+ */
+function readAnonId(): string {
+  try {
+    const existing = window.localStorage.getItem(ANON_ID_KEY);
+    if (existing && ID_PATTERN.test(existing)) return existing;
+    const created =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID().replace(/-/g, "")
+        : `${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+    window.localStorage.setItem(ANON_ID_KEY, created);
+    return created;
+  } catch {
+    return "";
+  }
+}
 
 function BugIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
@@ -71,15 +96,56 @@ function ReportBugButton() {
   const [heartCount, setHeartCount] = useState<number>(() => {
     if (typeof window === "undefined") return 0;
     try {
-      const stored = Number(window.localStorage.getItem("letspoly_likes") || "0");
+      const stored = Number(window.localStorage.getItem(LOCAL_COUNT_KEY) || "0");
       return Number.isFinite(stored) && stored > 0 ? stored : 0;
     } catch {
       return 0;
     }
   });
-  const countedRef = useRef(false);
+  const inFlightRef = useRef(false);
+  // True once the shared counter answers; false keeps the older per-browser count.
+  const [shared, setShared] = useState(false);
+  // One heart per visitor, remembered per browser so a reload cannot re-count.
+  const [contributed, setContributed] = useState(false);
 
-  const showLove = () => {
+  // Load the shared total once, and remember whether this browser already gave
+  // a heart (so a reload/second visit cannot count twice).
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        if (window.localStorage.getItem(HEART_GIVEN_KEY) === "1" && !cancelled) setContributed(true);
+      } catch {
+        /* ignore */
+      }
+
+      try {
+        const res = await fetch("/api/hearts", { cache: "no-store" });
+        const data = (await res.json().catch(() => null)) as
+          | { ok?: boolean; configured?: boolean; count?: number }
+          | null;
+        if (cancelled || !data?.ok || !data.configured || typeof data.count !== "number") return;
+        setShared(true);
+        setHeartCount(data.count);
+        try {
+          window.localStorage.setItem(LOCAL_COUNT_KEY, String(data.count));
+        } catch {
+          /* ignore */
+        }
+      } catch {
+        /* offline / no store — keep the per-browser count */
+      }
+    };
+
+    void load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const showLove = async () => {
     playLikeDing();
     const base = Date.now();
     const batch = Array.from({ length: 7 }, (_, i) => ({
@@ -94,18 +160,62 @@ function ReportBugButton() {
       () => setHearts((prev) => prev.filter((h) => !batch.some((b) => b.id === h.id))),
       1700
     );
-    // Count this visitor only once per website open (per page load).
-    if (!countedRef.current) {
-      countedRef.current = true;
-      setHeartCount((prev) => {
-        const next = prev + 1;
+    // One heart per visitor: the server de-duplicates on this browser's
+    // anonymous id, so a repeat click (or a cleared page) cannot grow the total.
+    if (contributed || inFlightRef.current) return;
+    inFlightRef.current = true;
+    setContributed(true);
+    setHeartCount((prev) => prev + 1); // optimistic
+    try {
+      window.localStorage.setItem(HEART_GIVEN_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+
+    const id = readAnonId();
+    try {
+      if (!id) throw new Error("no visitor id");
+      const res = await fetch("/api/hearts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const data = (await res.json().catch(() => null)) as
+        | { ok?: boolean; configured?: boolean; counted?: boolean; count?: number; error?: string }
+        | null;
+
+      if (res.status === 503 && data?.configured === false) {
+        // No shared store configured: behave exactly like the old local counter.
+        setShared(false);
         try {
-          window.localStorage.setItem("letspoly_likes", String(next));
+          window.localStorage.setItem(LOCAL_COUNT_KEY, String(heartCount + 1));
         } catch {
           /* ignore */
         }
-        return next;
-      });
+        return;
+      }
+      if (!res.ok || !data?.ok || typeof data.count !== "number") {
+        throw new Error(data?.error || `Request failed: ${res.status}`);
+      }
+
+      setShared(true);
+      setHeartCount(data.count);
+      try {
+        window.localStorage.setItem(LOCAL_COUNT_KEY, String(data.count));
+      } catch {
+        /* ignore */
+      }
+    } catch {
+      // Genuine failure (offline, store down): undo so the visitor can retry.
+      setContributed(false);
+      setHeartCount((prev) => Math.max(0, prev - 1));
+      try {
+        window.localStorage.removeItem(HEART_GIVEN_KEY);
+      } catch {
+        /* ignore */
+      }
+    } finally {
+      inFlightRef.current = false;
     }
   };
 
@@ -242,14 +352,35 @@ function ReportBugButton() {
               <button
                 type="button"
                 onClick={showLove}
-                title="Leave your mark"
-                aria-label="Leave your mark"
-                className="group inline-flex min-h-10 touch-manipulation items-center gap-2 rounded-full border border-rose-500/30 bg-rose-500/5 px-3.5 py-1.5 text-xs font-semibold text-rose-200 transition hover:border-rose-400/60 hover:bg-rose-500/10"
+                aria-pressed={contributed}
+                title={
+                  contributed
+                    ? "Thanks — one heart per visitor"
+                    : shared
+                      ? "Leave your mark — counted across all visitors"
+                      : "Leave your mark — counted on this device"
+                }
+                aria-label={
+                  contributed
+                    ? "You already left a heart — thank you"
+                    : "Leave your mark (one heart per visitor)"
+                }
+                className={`group inline-flex min-h-10 touch-manipulation items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition ${
+                  contributed
+                    ? "border-rose-400/60 bg-rose-500/20 text-rose-100"
+                    : "border-rose-500/30 bg-rose-500/5 text-rose-200 hover:border-rose-400/60 hover:bg-rose-500/10"
+                }`}
               >
-                <HeartIcon className="h-4 w-4 text-rose-400 transition group-hover:scale-110" />
-                <span>{heartCount}</span>
+                <HeartIcon
+                  className={`h-4 w-4 text-rose-400 transition group-hover:scale-110 ${
+                    contributed ? "scale-125" : ""
+                  }`}
+                />
+                <span>{heartCount.toLocaleString("en-US")}</span>
               </button>
-              <span className="text-[11px] text-slate-500">anonymous love</span>
+              <span className="text-[11px] text-slate-500">
+                {contributed ? "thanks for the love" : "anonymous love"}
+              </span>
             </div>
           </div>
         </div>

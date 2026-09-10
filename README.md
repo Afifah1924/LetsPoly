@@ -57,6 +57,31 @@ Environment variables — copy `.env.example` to `.env.local` for local testing 
 | `REPORT_FROM` | no | `From` header (default `LetsPoly Reports <onboarding@resend.dev>`) |
 | `NEXT_PUBLIC_SUPPORT_EMAIL` | no | Address shown in the browser's “or email us” fallback link; unset = link hidden |
 
+## Anonymous hearts (shared counter)
+
+The “leave your mark” heart in the report panel is counted **globally**: every
+distinct visitor adds one, and each visitor can add only one.
+
+- `GET /api/hearts` → `{ ok, configured, count }`
+- `POST /api/hearts` `{ id }` → `{ ok, configured, counted, count }`
+
+How it stays honest without accounts:
+
+- The browser generates a random anonymous id (localStorage) — no personal data.
+  The server records it once with `SET … NX`, so a repeat click, reload or a
+  second visit returns `counted: false` and leaves the total untouched.
+- A per‑IP daily budget applies to **new** hearts only, so shared networks
+  (school/office/mobile) are not blocked and one person cannot inflate the total.
+- Storage is Redis over the Upstash/Vercel KV REST API (no npm dependency).
+  Env: `KV_REST_API_URL` + `KV_REST_API_TOKEN`, or the Upstash equivalents.
+
+**Setup (1 minute, free):** create a Redis database at
+[upstash.com](https://upstash.com) (or add Vercel KV to the project) and copy the
+two REST values into the Vercel environment variables, then redeploy.
+
+With no store configured the route reports `configured: false` and the UI keeps
+the older per‑browser counter, so nothing breaks.
+
 ## Deploy on Vercel
 
 The app is a standard Next.js project, so Vercel needs no extra configuration:
