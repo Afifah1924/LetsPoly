@@ -6,8 +6,9 @@ Interactive polyhedron construction — explore 3D solids, unfold them into 2D n
 
 ## Features
 
-- **Home** (`/`) — landing page.
-- **Explorer** (`/explorer`) — rotate and zoom 3D polyhedra, play the fold/unfold transition, and use the net panel (the `app/generator/components/*` pieces) to pick a solid, size the template and print it.
+- **Explorer** (`/`) — the main app: rotate and zoom 3D polyhedra, play the fold/unfold transition, and use the net panel (the `app/generator/components/*` pieces) to pick a solid, size the template and print it.
+- **`/explorer`** — permanent redirect to `/`, kept so older links keep working.
+- **`/home`** — the original landing page, preserved but not linked from the app.
 - **Report widget** — the floating button (bottom-right) emails anonymous bug reports / feedback to the maintainer through this app's own serverless route.
 
 ## Getting Started

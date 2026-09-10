@@ -18,6 +18,13 @@ const isolatedLocalProdBuild =
 
 const nextConfig: NextConfig = {
   distDir: isolatedLocalProdBuild ? ".next-build" : ".next",
+  /**
+   * The interactive app used to live at /explorer. It is now the home page, so
+   * /explorer permanently redirects to / to keep old links working.
+   */
+  async redirects() {
+    return [{ source: "/explorer", destination: "/", permanent: true }];
+  },
 };
 
 export default nextConfig;
