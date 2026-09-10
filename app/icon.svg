@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="LetsPoly">
+  <defs>
+    <linearGradient id="lpBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0B1220" />
+      <stop offset="1" stop-color="#0E2A28" />
+    </linearGradient>
+    <linearGradient id="lpLine" x1="0.1" y1="0" x2="0.9" y2="1">
+      <stop offset="0" stop-color="#7DF9D8" />
+      <stop offset="0.55" stop-color="#2DD4BF" />
+      <stop offset="1" stop-color="#10B981" />
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded tile -->
+  <rect width="64" height="64" rx="15" fill="url(#lpBg)" />
+  <rect x="1.25" y="1.25" width="61.5" height="61.5" rx="13.75" fill="none" stroke="#2DD4BF" stroke-opacity="0.28" stroke-width="1.5" />
+
+  <!-- Isometric polyhedron (hexagon silhouette + visible edges) -->
+  <g fill="none" stroke="url(#lpLine)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M32 9 L52 20.5 L52 43.5 L32 55 L12 43.5 L12 20.5 Z" />
+    <path d="M12 20.5 L32 32 L52 20.5" />
+    <path d="M32 32 L32 55" />
+  </g>
+</svg>
