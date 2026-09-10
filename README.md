@@ -48,12 +48,12 @@ The dev/production output folders are kept separate (`next.config.ts`) so a prod
 
 `POST /api/report` (`app/api/report/route.ts`) validates the message, silently drops honeypot spam, applies a light per-IP rate limit (5 reports / 10 minutes) and sends the email through [Resend](https://resend.com) **server-side**, so the API key is never exposed to the browser.
 
-Environment variables — copy `.env.example` to `.env.local` for local testing and add the same keys in Vercel for production. The inbox address is **not** committed to the repo, so it lives only in these variables:
+Environment variables — copy `.env.example` to `.env.local` for local testing and add the same keys in Vercel for production. Only the API key is required — reports go to the default project inbox unless `REPORT_TO_EMAIL` overrides it:
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `RESEND_API_KEY` | yes | Resend API key (`re_...`) |
-| `REPORT_TO_EMAIL` | yes | Inbox that receives the reports |
+| `REPORT_TO_EMAIL` | no | Overrides the default project inbox (`letspolymake@gmail.com`) |
 | `REPORT_FROM` | no | `From` header (default `LetsPoly Reports <onboarding@resend.dev>`) |
 | `NEXT_PUBLIC_SUPPORT_EMAIL` | no | Address shown in the browser's “or email us” fallback link; unset = link hidden |
 

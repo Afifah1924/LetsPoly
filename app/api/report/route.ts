@@ -6,16 +6,20 @@ export const runtime = "nodejs";
  * Anonymous bug-report / feedback endpoint.
  *
  * The browser posts here (never to a third-party relay) and the message is
- * emailed via Resend with a server-side secret, so neither the API key nor the
- * destination address is exposed to visitors.
+ * emailed via Resend with a server-side secret, so the API key is never exposed
+ * to visitors.
  *
  * Environment variables (set in Vercel + a local `.env.local`):
- *   RESEND_API_KEY   - re_... (secret)
- *   REPORT_TO_EMAIL  - inbox that receives the reports (e.g. you@example.com)
+ *   RESEND_API_KEY   - re_... (required, secret)
+ *   REPORT_TO_EMAIL  - optional, overrides the default project inbox below
  *   REPORT_FROM      - optional, defaults to "LetsPoly Reports <onboarding@resend.dev>"
  *
- * No address is hardcoded here, so the public repo never exposes the inbox.
+ * Reports default to the shared project inbox; set REPORT_TO_EMAIL to route
+ * them somewhere else without touching the code.
  */
+
+/** Shared project inbox that receives the bug reports / feedback. */
+const DEFAULT_REPORT_TO = "letspolymake@gmail.com";
 
 const MAX_MESSAGE = 2000;
 const MIN_MESSAGE = 3;
@@ -80,10 +84,10 @@ export async function POST(request: Request) {
   }
 
   const apiKey = process.env.RESEND_API_KEY;
-  const to = process.env.REPORT_TO_EMAIL;
+  const to = process.env.REPORT_TO_EMAIL ?? DEFAULT_REPORT_TO;
   const from = process.env.REPORT_FROM ?? "LetsPoly Reports <onboarding@resend.dev>";
 
-  if (!apiKey || !to) {
+  if (!apiKey) {
     return NextResponse.json(
       { ok: false, error: "Email service is not configured yet." },
       { status: 500 }
