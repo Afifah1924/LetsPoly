@@ -3,11 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 
 /**
- * Optional support address for the "email us instead" fallback.
- * Comes from NEXT_PUBLIC_SUPPORT_EMAIL so the real inbox is not committed to
- * the public repo; when unset, the fallback link is simply hidden.
+ * Support address for the "email us instead" fallback in the report panel.
+ * Defaults to the project inbox; set NEXT_PUBLIC_SUPPORT_EMAIL to override it
+ * (an empty value hides the fallback link entirely).
  */
-const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "";
+const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "letspolymake@gmail.com";
 
 /** localStorage keys for the anonymous heart counter. */
 const ANON_ID_KEY = "letspoly_anon_id";

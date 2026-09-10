@@ -55,7 +55,7 @@ Environment variables — copy `.env.example` to `.env.local` for local testing 
 | `RESEND_API_KEY` | yes | Resend API key (`re_...`) |
 | `REPORT_TO_EMAIL` | no | Overrides the default project inbox (`letspolymake@gmail.com`) |
 | `REPORT_FROM` | no | `From` header (default `LetsPoly Reports <onboarding@resend.dev>`) |
-| `NEXT_PUBLIC_SUPPORT_EMAIL` | no | Address shown in the browser's “or email us” fallback link; unset = link hidden |
+| `NEXT_PUBLIC_SUPPORT_EMAIL` | no | Fallback address in the “or email us” link (default `letspolymake@gmail.com`; empty hides the link) |
 
 ## Anonymous hearts (shared counter)
 
