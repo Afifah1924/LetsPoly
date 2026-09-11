@@ -318,7 +318,7 @@ function ReportBugButton() {
               onChange={(event) => setMessage(event.target.value)}
               rows={4}
               placeholder="Describe what happened…"
-              className="w-full resize-none rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3 text-sm text-white placeholder-slate-500 outline-none transition focus:border-teal-400"
+              className="w-full resize-none rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3 text-base text-white placeholder-slate-500 outline-none transition focus:border-teal-400 sm:text-sm"
             />
             <div className="flex items-center justify-end gap-2">
               <button
@@ -432,7 +432,7 @@ export default function SiteFooter() {
   return (
     <>
       <footer className="border-t border-slate-800/70 bg-gradient-to-b from-transparent to-slate-950/60">
-        <div className="mx-auto flex w-full max-w-[min(90vw,1600px)] flex-col items-center justify-between gap-5 px-6 py-7 sm:flex-row sm:items-center">
+        <div className="mx-auto flex w-full max-w-full flex-col items-center justify-between gap-5 px-4 py-7 sm:max-w-[min(90vw,1600px)] sm:flex-row sm:items-center sm:px-6">
           <div className="text-center sm:text-left">
             <p className="flex items-center justify-center gap-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-teal-300 sm:justify-start">
               <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-teal-400" />

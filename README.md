@@ -40,7 +40,10 @@ The dev/production output folders are kept separate (`next.config.ts`) so a prod
 ## Mobile & touch
 
 - **One finger drag rotates** the model; **two fingers pinch to zoom**. The 3D stage sets `touch-action: none`, so the page never scrolls away while you drag (this was the "can't rotate on a phone" bug — without it the browser claims the gesture and fires `pointercancel`).
+- **Phones get the full viewport width.** The `min(90vw, 1600px)` desktop cap only applies from `sm` up, and the header, sticky picker, workspace and footer share one container, so the picker chips line up with the page content instead of hanging out over the left edge. Wasting 10% of a 390px screen also used to squeeze the structure-info cards until their labels spilled out of the 2-column grid.
 - Below the `xl` breakpoint the layout stacks and reorders: a **sticky shape picker** (`/`), then the live preview, then the structure info. The full structures list is desktop-only.
+- The picker **scrolls the selected chip into view** (it is centred on load and after every tap). It is the only way to change the solid on a phone, and the header badge that names it is desktop-only — so an off-screen chip left no indication of what was loaded.
+- Text fields are **16px on phones** (14px from `sm` up) so iOS Safari does not zoom the viewport when one is focused; that zoom used to shift the whole layout while entering a net size.
 - All controls are at least **40px** tall, and the fold slider has a 40px touch area.
 - The `?` badge next to the preview toggles a gesture cheat-sheet (it is tappable, not hover-only).
 

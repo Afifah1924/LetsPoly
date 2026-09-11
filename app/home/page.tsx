@@ -36,18 +36,18 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
 
-      <nav className="flex justify-between items-center px-8 py-6 max-w-6xl mx-auto">
+      <nav className="flex justify-between items-center px-5 py-5 max-w-6xl mx-auto sm:px-8 sm:py-6">
         <h1 className="font-[family-name:var(--font-space-grotesk)] text-2xl font-bold tracking-tight">
           Lets<span className="text-teal-600">Poly</span>
         </h1>
 
-        <button className="rounded-full bg-slate-900 px-5 py-2 text-white">
+        <button className="min-h-10 rounded-full bg-slate-900 px-5 py-2 text-white">
           Explore
         </button>
       </nav>
 
 
-      <section className="relative max-w-6xl mx-auto px-8 py-16">
+      <section className="relative max-w-6xl mx-auto px-5 py-12 sm:px-8 sm:py-16">
 
         <div className="absolute right-20 top-40 hidden h-48 w-48 rotate-12 rounded-3xl border border-slate-200 bg-white shadow-xl md:block">
           <div className="absolute inset-6 rotate-12 rounded-2xl border border-slate-200"></div>
@@ -60,7 +60,7 @@ export default function Home() {
             Digital Design System
           </p>
 
-          <h2 className="mt-6 text-6xl font-semibold tracking-tight">
+          <h2 className="mt-6 text-4xl font-semibold tracking-tight sm:text-5xl lg:text-6xl">
             Templates shaped with structure.
           </h2>
 
@@ -83,7 +83,7 @@ export default function Home() {
               key={domain.name}
               type="button"
               onClick={() => setSelectedDomain(domain.name)}
-              className={`group rounded-3xl border border-white/60 p-8 text-left shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg ${domain.color} ${selectedDomain === domain.name ? "ring-4 ring-slate-900/10" : ""}`}
+              className={`group rounded-3xl border border-white/60 p-6 text-left shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-lg sm:p-8 ${domain.color} ${selectedDomain === domain.name ? "ring-4 ring-slate-900/10" : ""}`}
             >
               <h3 className="text-xl font-medium tracking-tight">
                 {domain.name}
@@ -98,7 +98,7 @@ export default function Home() {
 
         {selectedDomainData ? (
 
-          <div className="mt-10 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+          <div className="mt-10 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
 
             <p className="text-sm uppercase tracking-[0.3em] text-slate-500">
               Selected Domain
@@ -116,7 +116,7 @@ export default function Home() {
 
         ) : (
 
-          <div className="mt-10 rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-slate-500">
+          <div className="mt-10 rounded-3xl border border-dashed border-slate-300 bg-white p-6 text-slate-500 sm:p-8">
             Select a domain to explore templates.
           </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import GeneratorPanel from "./generator/components/GeneratorPanel";
 import SiteFooter from "./components/SiteFooter";
 
@@ -137,15 +137,31 @@ export default function ExplorerPage() {
   ];
   const allShapes = structureSections.flatMap((section) => section.items);
 
+  // The mobile picker only scrolls horizontally, so keep the selected chip in
+  // view — otherwise the current structure can sit off-screen on a phone with
+  // no indication of which solid is loaded.
+  const pickerRef = useRef<HTMLDivElement | null>(null);
+  const activeChipRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    const strip = pickerRef.current;
+    const chip = activeChipRef.current;
+    if (!strip || !chip) return;
+    const stripBox = strip.getBoundingClientRect();
+    const chipBox = chip.getBoundingClientRect();
+    const centred =
+      strip.scrollLeft + (chipBox.left - stripBox.left) - (strip.clientWidth - chipBox.width) / 2;
+    strip.scrollTo({ left: Math.max(0, centred), behavior: "smooth" });
+  }, [activeShape]);
+
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
       <header className="border-b border-slate-800">
-        <div className="mx-auto flex w-full max-w-[min(90vw,1600px)] items-center justify-between gap-3 px-4 py-4 sm:px-6 sm:py-5">
+        <div className="mx-auto flex w-full max-w-full items-center justify-between gap-3 px-4 py-4 sm:max-w-[min(90vw,1600px)] sm:px-6 sm:py-5">
           <div className="min-w-0">
             <h1 className="font-[family-name:var(--font-space-grotesk)] text-2xl font-bold tracking-tight text-white sm:text-3xl">
               Lets<span className="text-teal-300">Poly</span>
             </h1>
-            <p className="mt-1.5 text-[10px] uppercase tracking-[0.2em] text-slate-500 sm:text-xs sm:tracking-[0.35em]">
+            <p className="mt-1.5 text-[11px] uppercase tracking-[0.14em] text-slate-500 sm:text-xs sm:tracking-[0.35em]">
               Interactive Polyhedron Construction
             </p>
           </div>
@@ -157,12 +173,16 @@ export default function ExplorerPage() {
 
       {/* Mobile / tablet shape picker — sticky so it is reachable while scrolling. */}
       <div className="sticky top-0 z-30 border-b border-slate-800/70 bg-slate-950/95 backdrop-blur xl:hidden">
-        <div className="no-scrollbar flex gap-2 overflow-x-auto px-4 py-3 sm:px-6">
+        <div
+          ref={pickerRef}
+          className="no-scrollbar mx-auto flex w-full max-w-full gap-2 overflow-x-auto px-4 py-3 sm:max-w-[min(90vw,1600px)] sm:px-6"
+        >
           {allShapes.map((shape) => {
             const active = activeShape === shape.name;
             return (
               <button
                 key={shape.name}
+                ref={active ? activeChipRef : null}
                 type="button"
                 onClick={() => setActiveShape(shape.name)}
                 aria-pressed={active}
@@ -179,7 +199,7 @@ export default function ExplorerPage() {
         </div>
       </div>
 
-      <section className="mx-auto grid w-full max-w-[min(90vw,1600px)] gap-6 px-4 py-6 sm:px-6 sm:py-10 xl:grid-cols-[2fr_6fr_2fr]">
+      <section className="mx-auto grid w-full max-w-full gap-6 px-4 py-6 sm:max-w-[min(90vw,1600px)] sm:px-6 sm:py-10 xl:grid-cols-[2fr_6fr_2fr]">
         <aside className="hidden space-y-6 rounded-[2rem] border border-slate-800 bg-slate-900/80 p-6 shadow-xl xl:order-1 xl:block">
           <div>
             <p className="text-xs uppercase tracking-[0.35em] text-teal-300">STRUCTURES</p>
@@ -230,12 +250,12 @@ export default function ExplorerPage() {
             {structureStats.map((stat) => (
               <div
                 key={stat.label}
-                className="flex flex-col gap-1 rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:rounded-none sm:border-0 sm:bg-transparent sm:px-0"
+                className="flex min-w-0 flex-col gap-1 rounded-2xl border border-slate-800 bg-slate-950/80 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:rounded-none sm:border-0 sm:bg-transparent sm:px-0"
               >
-                <span className="text-[11px] uppercase tracking-[0.2em] text-slate-500 sm:text-sm sm:normal-case sm:tracking-normal">
+                <span className="min-w-0 break-words text-[11px] uppercase tracking-[0.12em] text-slate-500 sm:text-sm sm:normal-case sm:tracking-normal">
                   {stat.label}
                 </span>
-                <span className="font-medium text-white">{stat.value}</span>
+                <span className="min-w-0 break-words font-medium text-white">{stat.value}</span>
               </div>
             ))}
           </div>

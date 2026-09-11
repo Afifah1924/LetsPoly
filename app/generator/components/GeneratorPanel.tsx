@@ -399,7 +399,7 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
                         setHeight(0);
                       }
                     }}
-                    className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-teal-400"
+                    className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-base text-white outline-none transition focus:border-teal-400 sm:text-sm"
                   />
                 </label>
                 <label className="space-y-2 text-slate-300">
@@ -419,7 +419,7 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
                       }
                     }}
                     placeholder="auto"
-                    className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-teal-400"
+                    className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-base text-white outline-none transition focus:border-teal-400 sm:text-sm"
                   />
                 </label>
               </div>
@@ -456,9 +456,11 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
                   <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Print pages</p>
                   <p className="mt-1 text-slate-400">
                     Tile the {fmtMm(fit?.netWidthMm ?? 0)} × {fmtMm(height)} mm net onto {paper} (
-                    {paperDims.w} × {paperDims.h} mm) →{" "}
-                    <span className="font-medium text-white">{paperPages}</span> page
-                    {paperPages === 1 ? "" : "s"}
+                    {paperDims.w} × {paperDims.h} mm){" "}
+                    <span className="whitespace-nowrap">
+                      → <span className="font-medium text-white">{paperPages}</span> page
+                      {paperPages === 1 ? "" : "s"}
+                    </span>
                   </p>
                 </div>
                 <div className="flex overflow-hidden rounded-full border border-slate-800">
