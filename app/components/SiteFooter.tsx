@@ -317,10 +317,10 @@ function ReportBugButton() {
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
           Feedback: text,
-          // Only sent when the visitor asked for a reply: `email` is the row that
-          // appears in the mail, `_replyto` is what makes "Reply" address the
-          // visitor instead of the form itself. Left out entirely otherwise, so
-          // an anonymous report stays anonymous.
+          // `email` is the row that appears in the mail; `_replyto` is what makes
+          // "Reply" in the inbox answer the visitor instead of the form itself.
+          // The address is required, so this is normally always set - the guard
+          // just keeps the payload honest if a submit ever arrives without it.
           ...(replyTo ? { email: replyTo, _replyto: replyTo } : {}),
           ...(typeof window !== "undefined" ? { Page: window.location.href } : {}),
           _subject: REPORT_SUBJECT,
@@ -372,13 +372,13 @@ function ReportBugButton() {
               <BugIcon /> Report bug / feedback
             </p>
             <p className="mt-1.5 text-sm leading-relaxed text-slate-300">
-              Spotted something? Let us know, anonymously!
+              Spotted something? Let us know!
             </p>
           </div>
 
           <div className="space-y-3 p-4">
-            {/* A real form: the feedback is required, the email is not, and the
-                browser validates the address before onSubmit runs. */}
+            {/* A real form: the feedback and the email address are both required,
+                and the browser validates the address before onSubmit runs. */}
             <form className="space-y-3" onSubmit={sendReport}>
               {/* Honeypot — hidden from humans, filled by bots (never sent). */}
               <div aria-hidden="true" className="pointer-events-none absolute -left-[9999px] h-0 w-0 overflow-hidden">
@@ -404,20 +404,17 @@ function ReportBugButton() {
                 placeholder="Describe what happened…"
                 className="w-full resize-none rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3 text-base text-white placeholder-slate-500 outline-none transition focus:border-teal-400 sm:text-sm"
               />
-              <div className="space-y-1.5">
-                <input
-                  type="email"
-                  name="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="Your email (optional)"
-                  autoComplete="email"
-                  className="w-full rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3 text-base text-white placeholder-slate-500 outline-none transition focus:border-teal-400 sm:text-sm"
-                />
-                <p className="px-1 text-[11px] leading-relaxed text-slate-500">
-                  Leave your email if you&rsquo;d like a reply.
-                </p>
-              </div>
+              <input
+                type="email"
+                name="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="Your email*"
+                autoComplete="email"
+                required
+                aria-label="Your email (required)"
+                className="w-full rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3 text-base text-white placeholder-slate-500 outline-none transition focus:border-teal-400 sm:text-sm"
+              />
               <p className="text-[11px] leading-relaxed text-slate-500">
                 Feedback is sent privately. Thanks for helping us improve.
               </p>

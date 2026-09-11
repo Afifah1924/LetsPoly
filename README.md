@@ -9,7 +9,7 @@ Interactive polyhedron construction — explore 3D solids, unfold them into 2D n
 - **Explorer** (`/`) — the main app: rotate and zoom 3D polyhedra, play the fold/unfold transition, and use the net panel (the `app/generator/components/*` pieces) to pick a solid, size the template and print it.
 - **`/explorer`** — permanent redirect to `/`, kept so older links keep working.
 - **`/home`** — the original landing page, preserved but not linked from the app.
-- **Report widget** — the floating button (bottom-right) emails anonymous bug reports / feedback to the project inbox through [FormSubmit](https://formsubmit.co), straight from the browser.
+- **Report widget** — the floating button (bottom-right) emails bug reports / feedback to the project inbox through [FormSubmit](https://formsubmit.co), straight from the browser.
 
 ## Getting Started
 
@@ -49,7 +49,7 @@ The dev/production output folders are kept separate (`next.config.ts`) so a prod
 - All controls are at least **40px** tall, and the fold slider has a 40px touch area.
 - The `?` badge next to the preview toggles a gesture cheat-sheet (it is tappable, not hover-only).
 
-## Anonymous bug reports / feedback
+## Bug reports / feedback
 
 The floating button (bottom-right) posts to [FormSubmit](https://formsubmit.co) **from the browser**:
 
@@ -62,12 +62,12 @@ No API key, no server route, no environment variables — the recipient address 
 | Form field | Sent as | Notes |
 | --- | --- | --- |
 | Feedback | `Feedback` | The textarea. Required, 3–2000 characters. |
-| Email *(optional)* | `email` + `_replyto` | Omitted entirely when left blank, so the report stays anonymous. When given, it is what "Reply" in the inbox addresses. |
+| Email | `email` + `_replyto` | Required. It is what "Reply" in the inbox answers. |
 | Page | `Page` | The page the report came from. |
 | Subject | `_subject` | `Let's Poly Make — Bug / Feedback Report`. |
 | Layout | `_template: "table"` | Readable rows rather than a wall of text. |
 
-The email address input is the only thing asked for beyond the report itself, and it is optional: leave it empty and the submission is still sent, with nothing identifying collected.
+The report and the email address are the only two things asked for — no name, no phone, nothing else. The address is required so a reply always has somewhere to go, and it is used for nothing except the mail's reply-to.
 
 **First-time activation (one click).** The first submission makes FormSubmit email an **"Activate Form"** link to `letspolymake@gmail.com`. Until that link is clicked it answers `{"success":"false","message":"This form needs Activation…"}` and nothing is delivered — the panel shows that message rather than a false success. Click it once and every later report is emailed straight through.
 
