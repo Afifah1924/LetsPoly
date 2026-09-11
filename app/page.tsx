@@ -31,6 +31,16 @@ const structureSections = [
   },
 ];
 
+/**
+ * Facts shown in the STRUCTURE INFO panel for each selectable solid.
+ *
+ * The counts must match the geometry actually built in
+ * `app/generator/components/polyhedronGeometry.ts` - visitors hold the model
+ * and the numbers side by side, so a copied-over row is a visible lie (Prism
+ * used to carry the square pyramid's 5/8/5 while the model drawn is a
+ * triangular prism, which is 5/6/9). Euler's V - E + F = 2 is satisfied by
+ * both, so only the geometry catches that kind of mistake.
+ */
 const structureDetails: Record<string, { name: string; category: string; faces: number; edges: number; vertices: number; faceShape: string; difficulty: string; symmetry: string }> = {
   Tetrahedron: {
     name: "Tetrahedron",
@@ -88,7 +98,9 @@ const structureDetails: Record<string, { name: string; category: string; faces: 
     faces: 14,
     edges: 36,
     vertices: 24,
-    faceShape: "Quadrilateral",
+    // Corner-truncated cube: the 6 square faces become octagons and the 8
+    // corners become triangles.
+    faceShape: "Triangle + Octagon",
     difficulty: "Medium",
     symmetry: "Medium",
   },
@@ -98,7 +110,8 @@ const structureDetails: Record<string, { name: string; category: string; faces: 
     faces: 32,
     edges: 90,
     vertices: 60,
-    faceShape: "Hexagon/Triangle",
+    // Corner-truncated icosahedron (the football): 20 hexagons + 12 pentagons.
+    faceShape: "Pentagon + Hexagon",
     difficulty: "Hard",
     symmetry: "High",
   },
@@ -106,9 +119,11 @@ const structureDetails: Record<string, { name: string; category: string; faces: 
     name: "Prism",
     category: "Other",
     faces: 5,
-    edges: 8,
-    vertices: 5,
-    faceShape: "Quadrilateral",
+    // Triangular prism (buildPrismGeometry): 2 triangles + 3 rectangles, so 6
+    // vertices and 9 edges - not the square pyramid's 5/8.
+    edges: 9,
+    vertices: 6,
+    faceShape: "Triangle + Quadrilateral",
     difficulty: "Easy",
     symmetry: "Low",
   },
@@ -118,7 +133,8 @@ const structureDetails: Record<string, { name: string; category: string; faces: 
     faces: 5,
     edges: 8,
     vertices: 5,
-    faceShape: "Triangle",
+    // Square pyramid (buildPyramidGeometry): 4 triangles on a square base.
+    faceShape: "Triangle + Square",
     difficulty: "Easy",
     symmetry: "Low",
   },
@@ -133,7 +149,9 @@ export default function ExplorerPage() {
     { label: "Faces", value: String(selectedStructure.faces) },
     { label: "Vertices", value: String(selectedStructure.vertices) },
     { label: "Edges", value: String(selectedStructure.edges) },
+    { label: "Face shape", value: selectedStructure.faceShape },
     { label: "Symmetry", value: selectedStructure.symmetry },
+    { label: "Difficulty", value: selectedStructure.difficulty },
   ];
   const allShapes = structureSections.flatMap((section) => section.items);
 
