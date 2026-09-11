@@ -51,6 +51,10 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
   // Live pointers on the drag surface: a second finger switches to pinch-zoom.
   const pointersRef = useRef(new Map<number, { x: number; y: number }>());
   const pinchRef = useRef<{ distance: number; zoom: number } | null>(null);
+  // A press that landed on a control, waiting to see whether it becomes a drag.
+  const pendingRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
+  // Set when a drag swallowed a control's press, so the trailing click is ignored.
+  const swallowClickRef = useRef(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
   // React's onWheel is a passive listener, so preventDefault silently fails.
@@ -103,22 +107,12 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
   /** The surface only captures gestures while a rotatable 3D view is showing. */
   const canRotate = viewMode === "3d" || (viewMode === "transition" && transitionStep === 1);
 
-  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    // Don't hijack clicks on interactive controls (e.g. the STEP / mode pills that
-    // live inside this drag surface). setPointerCapture() on pointer-down retargets
-    // the pointer so the button's click event never fires -> preview "gets stuck".
-    const target = event.target as HTMLElement | null;
-    const onControl =
-      !!target &&
-      typeof target.closest === "function" &&
-      !!target.closest("button, a, input, select, textarea, label");
-    if (onControl) return;
-    if (event.pointerType === "mouse" && event.button !== 0) return;
-    if (!canRotate) return;
+  /** Movement that turns a press on a control into a rotate drag instead of a tap. */
+  const DRAG_SLOP = 8;
 
-    setHelpOpen(false);
-    pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    event.currentTarget.setPointerCapture(event.pointerId);
+  /** Begins a rotate/pinch drag for a pointer, remembering the press origin. */
+  const startDrag = (pointerId: number, x: number, y: number) => {
+    pointersRef.current.set(pointerId, { x, y });
 
     // A second finger on the surface switches to pinch-to-zoom.
     if (pointersRef.current.size >= 2) {
@@ -130,17 +124,47 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
     }
 
     draggingRef.current = true;
-    dragStartRef.current = {
-      x: event.clientX,
-      y: event.clientY,
-      rotateX,
-      rotateY,
-      offsetX: offset.x,
-      offsetY: offset.y,
-    };
+    dragStartRef.current = { x, y, rotateX, rotateY, offsetX: offset.x, offsetY: offset.y };
+  };
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    // Interactive controls (the STEP pills, the help button) live *inside* the
+    // preview, so a thumb often lands on one before the swipe starts. Capturing
+    // the pointer on those would retarget the events and kill the control's
+    // click, so remember the press instead and only take over once it has
+    // travelled past DRAG_SLOP (see handlePointerMove).
+    const target = event.target as HTMLElement | null;
+    const onControl =
+      !!target &&
+      typeof target.closest === "function" &&
+      !!target.closest("button, a, input, select, textarea, label");
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    if (!canRotate) return;
+
+    swallowClickRef.current = false;
+    if (onControl) {
+      pendingRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+      return;
+    }
+
+    setHelpOpen(false);
+    event.currentTarget.setPointerCapture(event.pointerId);
+    startDrag(event.pointerId, event.clientX, event.clientY);
   };
 
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const pending = pendingRef.current;
+    if (pending && pending.pointerId === event.pointerId) {
+      // Still a tap? Leave it to the control.
+      if (Math.hypot(event.clientX - pending.x, event.clientY - pending.y) <= DRAG_SLOP) return;
+      // A swipe that started on a pill / the help button becomes a rotate drag.
+      pendingRef.current = null;
+      swallowClickRef.current = true;
+      setHelpOpen(false);
+      event.currentTarget.setPointerCapture(event.pointerId);
+      startDrag(event.pointerId, pending.x, pending.y);
+    }
+
     if (!pointersRef.current.has(event.pointerId)) return;
     pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
 
@@ -163,15 +187,25 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
         y: dragStartRef.current.offsetY + dy,
       });
     } else {
-      setRotateX(Math.max(-80, Math.min(80, dragStartRef.current.rotateX + dy * 0.2)));
-      setRotateY(dragStartRef.current.rotateY + dx * 0.2);
+      // A thumb covers far fewer pixels than a mouse drag, so touch rotates faster.
+      const speed = event.pointerType === "touch" ? 0.35 : 0.2;
+      setRotateX(Math.max(-80, Math.min(80, dragStartRef.current.rotateX + dy * speed)));
+      setRotateY(dragStartRef.current.rotateY + dx * speed);
     }
   };
 
   const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (pendingRef.current?.pointerId === event.pointerId) pendingRef.current = null;
     pointersRef.current.delete(event.pointerId);
     if (pointersRef.current.size < 2) pinchRef.current = null;
     if (pointersRef.current.size === 0) draggingRef.current = false;
+    // The click after a promoted drag is swallowed below; drop the flag anyway in
+    // case the browser sends no click at all.
+    if (swallowClickRef.current) {
+      window.setTimeout(() => {
+        swallowClickRef.current = false;
+      }, 400);
+    }
   };
 
   return (
@@ -277,12 +311,19 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
                         // also forces the width, which overflows the column.
                         "min-h-[58svh] sm:aspect-[16/10] sm:min-h-0"
                       : "aspect-square sm:aspect-[16/10]"
-                } ${canRotate ? "touch-none select-none" : ""}`}
+                } ${canRotate ? "touch-none select-none cursor-grab active:cursor-grabbing" : ""}`}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
                 onPointerCancel={handlePointerUp}
                 onPointerLeave={handlePointerUp}
+                onClickCapture={(event) => {
+                  // A swipe that started on a pill must not also activate it.
+                  if (!swallowClickRef.current) return;
+                  swallowClickRef.current = false;
+                  event.stopPropagation();
+                  event.preventDefault();
+                }}
               >
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(45,212,191,0.14),_transparent_40%),linear-gradient(rgba(148,163,184,0.08)_1px,_transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.08)_1px,_transparent_1px)] bg-[length:80px_80px]" />
                 <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),transparent_30%)]" />
