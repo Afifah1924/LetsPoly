@@ -16,6 +16,12 @@ export const runtime = "nodejs";
  *
  * Reports default to the shared project inbox; set REPORT_TO_EMAIL to route
  * them somewhere else without touching the code.
+ *
+ * Resend sandbox caveat: the default `onboarding@resend.dev` sender only
+ * delivers to the address that owns the Resend account, so that account must be
+ * the inbox above - otherwise verify a sending domain and set REPORT_FROM.
+ * The report panel also offers a pre-filled `mailto:` fallback
+ * (app/components/SiteFooter.tsx) so a report can reach the inbox by hand.
  */
 
 /** Shared project inbox that receives the bug reports / feedback. */
@@ -89,7 +95,12 @@ export async function POST(request: Request) {
 
   if (!apiKey) {
     return NextResponse.json(
-      { ok: false, error: "Email service is not configured yet." },
+      {
+        ok: false,
+        // Names the missing variable so a misconfigured deployment is obvious
+        // from the response body alone (the name is not a secret).
+        error: "Email service is not configured yet (RESEND_API_KEY is missing).",
+      },
       { status: 500 }
     );
   }

@@ -57,6 +57,17 @@ Environment variables — copy `.env.example` to `.env.local` for local testing 
 | `REPORT_FROM` | no | `From` header (default `LetsPoly Reports <onboarding@resend.dev>`) |
 | `NEXT_PUBLIC_SUPPORT_EMAIL` | no | Fallback address in the “or email us” link (default `letspolymake@gmail.com`; empty hides the link) |
 
+**Getting delivery working.** The recipient is already correct — the project inbox — so only two things stand between a submitted report and your inbox:
+
+1. **`RESEND_API_KEY`** in Vercel → Settings → Environment Variables (Production *and* Preview), then **Redeploy** — environment changes only apply to new deployments.
+2. **A sender Resend accepts.** Until a sending domain is verified, the sandbox sender `onboarding@resend.dev` only delivers to the address that **owns the Resend account**. So either sign up for Resend *as* `letspolymake@gmail.com`, or verify a domain and point `REPORT_FROM` at it.
+
+Until step 1 is done, `POST /api/report` answers `500 {"ok": false, "error": "Email service is not configured yet (RESEND_API_KEY is missing)."}` — the message names the variable so a misconfigured deployment is obvious from the response alone.
+
+No key? The report still gets through: on failure the panel shows a **pre-filled** `mailto:` link (subject, the visitor's text and the page URL), so their mail client opens ready to send to the same inbox. Hide that link entirely by setting `NEXT_PUBLIC_SUPPORT_EMAIL` to an empty value.
+
+> **Not used: Web3Forms.** Its free plan rejects server-side calls (`403 … Pro plan is required`), and posting from the browser would expose the key — which is exactly why reports are relayed through this route instead of a client-side form service.
+
 ## Anonymous hearts (shared counter)
 
 The “leave your mark” heart in the report panel is counted **globally**: every

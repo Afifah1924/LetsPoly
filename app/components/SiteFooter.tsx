@@ -9,6 +9,23 @@ import { useEffect, useRef, useState } from "react";
  */
 const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "letspolymake@gmail.com";
 
+/** Keep in sync with the subject used in app/api/report/route.ts. */
+const REPORT_SUBJECT = "[LetsPoly] Bug report / feedback";
+
+/**
+ * Pre-fills the visitor's mail client with the report they already typed, so
+ * the message still reaches the project inbox when the server endpoint is
+ * unavailable or unconfigured (and the visitor gets a copy of what they sent).
+ */
+function buildMailtoHref(supportEmail: string, draft: string): string {
+  if (!supportEmail) return "";
+  const page = typeof window === "undefined" ? "" : window.location.href;
+  const body = [draft.trim(), "", "\u2014", "Sent from the LetsPoly site.", page ? `Page: ${page}` : ""]
+    .filter(Boolean)
+    .join("\n");
+  return `mailto:${supportEmail}?subject=${encodeURIComponent(REPORT_SUBJECT)}&body=${encodeURIComponent(body)}`;
+}
+
 /** localStorage keys for the anonymous heart counter. */
 const ANON_ID_KEY = "letspoly_anon_id";
 const HEART_GIVEN_KEY = "letspoly_heart_given";
@@ -338,10 +355,12 @@ function ReportBugButton() {
                 {SUPPORT_EMAIL ? (
                   <>
                     {"You can also email "}
-                    <a className="underline" href={`mailto:${SUPPORT_EMAIL}`}>
+                    <a className="underline" href={buildMailtoHref(SUPPORT_EMAIL, message)}>
                       {SUPPORT_EMAIL}
                     </a>
-                    .
+                    {message.trim()
+                      ? " — your text is already filled in."
+                      : "."}
                   </>
                 ) : (
                   "Please try again in a moment."
