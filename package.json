@@ -7,8 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "hearts:check": "node hearts-check.mjs",
-    "report:check": "node report-check.mjs"
+    "hearts:check": "node hearts-check.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.8",

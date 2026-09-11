@@ -3,32 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 
 /**
- * Optional "email us instead" fallback address for the report panel.
+ * Bug reports / feedback go straight to the project inbox through FormSubmit - a
+ * form-to-email relay the browser posts to itself, so there is no API key, no
+ * server route and nothing to configure per deployment.
  *
- * Deliberately empty by default: the report form exists so a message goes from
- * our own server straight to the project inbox, and bouncing a visitor into
- * their own mail client (a third-party app on their device, with our address
- * pre-filled) is not a substitute for that. Set NEXT_PUBLIC_SUPPORT_EMAIL to an
- * address to bring the pre-filled `mailto:` link back.
+ * The AJAX endpoint is used (JSON in, JSON out) so the panel can show its own
+ * success/error state without the visitor ever leaving the page. The address in
+ * the URL is the destination, and it has to click FormSubmit's one-off
+ * "Activate Form" link once before submissions are delivered.
  */
-const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "";
+const FORM_ENDPOINT = "https://formsubmit.co/ajax/letspolymake@gmail.com";
 
-/** Keep in sync with the subject used in app/api/report/route.ts. */
-const REPORT_SUBJECT = "[LetsPoly] Bug report / feedback";
-
-/**
- * Pre-fills the visitor's mail client with the report they already typed, so
- * the message still reaches the project inbox when the server endpoint is
- * unavailable or unconfigured (and the visitor gets a copy of what they sent).
- */
-function buildMailtoHref(supportEmail: string, draft: string): string {
-  if (!supportEmail) return "";
-  const page = typeof window === "undefined" ? "" : window.location.href;
-  const body = [draft.trim(), "", "\u2014", "Sent from the LetsPoly site.", page ? `Page: ${page}` : ""]
-    .filter(Boolean)
-    .join("\n");
-  return `mailto:${supportEmail}?subject=${encodeURIComponent(REPORT_SUBJECT)}&body=${encodeURIComponent(body)}`;
-}
+/** Subject the report arrives under, so replies keep the thread readable. */
+const REPORT_SUBJECT = "Let's Poly Make — Bug / Feedback Report";
 
 /** localStorage keys for the anonymous heart counter. */
 const ANON_ID_KEY = "letspoly_anon_id";
@@ -122,9 +109,8 @@ function ReportBugButton() {
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [errorText, setErrorText] = useState("");
-  // null = not asked yet, false = /api/report says it is not connected, so the
-  // panel says so up front instead of failing after the visitor has typed.
-  const [reportReady, setReportReady] = useState<boolean | null>(null);
+  // Optional: only used to set the reply-to address on the emailed report.
+  const [email, setEmail] = useState("");
   // Honeypot: invisible to humans; bots that fill it are silently ignored.
   const [honeypot, setHoneypot] = useState("");
   const [hearts, setHearts] = useState<
@@ -149,30 +135,6 @@ function ReportBugButton() {
   const [heartNote, setHeartNote] = useState("");
   // Set while this visitor's own heart may not have reached a stale GET yet.
   const gaveHeartRef = useRef(false);
-
-  // Once the panel is first opened, ask the endpoint whether reports can be
-  // delivered at all (GET /api/report reports only whether RESEND_API_KEY is
-  // present, never its value). Failing early is the whole point: a visitor must
-  // not write a report only to be handed an error - or worse, a link that opens
-  // their own mail app - at the end.
-  useEffect(() => {
-    if (!open || reportReady !== null) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await fetch("/api/report", { cache: "no-store" });
-        const data = (await res.json().catch(() => null)) as
-          | { ok?: boolean; configured?: boolean }
-          | null;
-        if (!cancelled && data?.ok) setReportReady(data.configured !== false);
-      } catch {
-        /* unknown: the send attempt reports the real reason */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [open, reportReady]);
 
   // Load the shared total once, and remember whether this browser already gave
   // a heart (so a reload/second visit cannot count twice).
@@ -318,38 +280,67 @@ function ReportBugButton() {
   };
 
   /**
-   * Send the report anonymously through our own `/api/report` serverless route
-   * (Resend, server-side API key). The visitor never leaves the page and no
-   * third-party relay sees the message.
+   * Sends the feedback to the project inbox through FormSubmit's AJAX endpoint:
+   * no server route, no key, and the visitor never leaves the page.
+   *
+   * FormSubmit answers HTTP 200 even when it refuses a submission, so the body's
+   * `success` flag - never the status code - decides whether the message was
+   * accepted.
    */
-  const sendReport = async () => {
+  const sendReport = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     const text = message.trim();
     if (!text || status === "sending") return;
+    // The browser has already run native validation by the time onSubmit fires
+    // (required feedback, `type="email"` address); this keeps programmatic
+    // submits honest too.
+    if (!event.currentTarget.checkValidity()) {
+      event.currentTarget.reportValidity();
+      return;
+    }
+
+    // Honeypot: hidden from humans, so a value here means a bot. Show what a
+    // person would see and send nothing.
+    if (honeypot.trim()) {
+      setStatus("sent");
+      setMessage("");
+      setEmail("");
+      return;
+    }
+
+    const replyTo = email.trim();
     setStatus("sending");
     setErrorText("");
     try {
-      const res = await fetch("/api/report", {
+      const res = await fetch(FORM_ENDPOINT, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
-          message: text,
-          page: typeof window !== "undefined" ? window.location.href : "",
-          company: honeypot,
+          Feedback: text,
+          // Only sent when the visitor asked for a reply: `email` is the row that
+          // appears in the mail, `_replyto` is what makes "Reply" address the
+          // visitor instead of the form itself. Left out entirely otherwise, so
+          // an anonymous report stays anonymous.
+          ...(replyTo ? { email: replyTo, _replyto: replyTo } : {}),
+          ...(typeof window !== "undefined" ? { Page: window.location.href } : {}),
+          _subject: REPORT_SUBJECT,
+          _template: "table",
         }),
       });
       const data = (await res.json().catch(() => null)) as
-        | { ok?: boolean; configured?: boolean; error?: string }
+        | { success?: string | boolean; message?: string }
         | null;
-      // An unconfigured deployment answers configured:false; record it so the
-      // panel stops offering to send until it is fixed.
-      if (data?.configured === false) setReportReady(false);
-      if (!res.ok || !data?.ok) {
-        throw new Error(data?.error || `Request failed: ${res.status}`);
+      if (!(data?.success === true || data?.success === "true")) {
+        // FormSubmit's own wording is the useful part here - it is what tells the
+        // maintainer that the form still needs activating.
+        throw new Error(data?.message || `The form service answered ${res.status}.`);
       }
       setStatus("sent");
       setMessage("");
+      setEmail("");
       setHoneypot("");
     } catch (err) {
+      // Never claim the report was sent, and never throw away what was typed.
       setErrorText(err instanceof Error ? err.message : "Something went wrong.");
       setStatus("error");
     }
@@ -386,79 +377,86 @@ function ReportBugButton() {
           </div>
 
           <div className="space-y-3 p-4">
-            {/* Honeypot — hidden from humans, filled by bots (server ignores those). */}
-            <div aria-hidden="true" className="pointer-events-none absolute -left-[9999px] h-0 w-0 overflow-hidden">
-              <label htmlFor="report-company">Company</label>
-              <input
-                id="report-company"
-                name="company"
-                type="text"
-                tabIndex={-1}
-                autoComplete="off"
-                value={honeypot}
-                onChange={(event) => setHoneypot(event.target.value)}
+            {/* A real form: the feedback is required, the email is not, and the
+                browser validates the address before onSubmit runs. */}
+            <form className="space-y-3" onSubmit={sendReport}>
+              {/* Honeypot — hidden from humans, filled by bots (never sent). */}
+              <div aria-hidden="true" className="pointer-events-none absolute -left-[9999px] h-0 w-0 overflow-hidden">
+                <label htmlFor="report-company">Company</label>
+                <input
+                  id="report-company"
+                  name="company"
+                  type="text"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  value={honeypot}
+                  onChange={(event) => setHoneypot(event.target.value)}
+                />
+              </div>
+              <textarea
+                name="feedback"
+                value={message}
+                onChange={(event) => setMessage(event.target.value)}
+                rows={4}
+                required
+                minLength={3}
+                maxLength={2000}
+                placeholder="Describe what happened…"
+                className="w-full resize-none rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3 text-base text-white placeholder-slate-500 outline-none transition focus:border-teal-400 sm:text-sm"
               />
-            </div>
-            <textarea
-              value={message}
-              onChange={(event) => setMessage(event.target.value)}
-              rows={4}
-              placeholder="Describe what happened…"
-              className="w-full resize-none rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3 text-base text-white placeholder-slate-500 outline-none transition focus:border-teal-400 sm:text-sm"
-            />
-            {reportReady === false && (
-              <p className="rounded-2xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-[11px] leading-relaxed text-amber-200">
-                Reports aren’t connected yet — sending is off until the site is finished setting
-                this up. Thanks for your patience.
+              <div className="space-y-1.5">
+                <input
+                  type="email"
+                  name="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="Your email (optional)"
+                  autoComplete="email"
+                  className="w-full rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3 text-base text-white placeholder-slate-500 outline-none transition focus:border-teal-400 sm:text-sm"
+                />
+                <p className="px-1 text-[11px] leading-relaxed text-slate-500">
+                  Leave your email if you&rsquo;d like a reply.
+                </p>
+              </div>
+              <p className="text-[11px] leading-relaxed text-slate-500">
+                Feedback is sent privately. Thanks for helping us improve.
               </p>
-            )}
-            <div className="flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setOpen(false);
-                  setMessage("");
-                  setStatus("idle");
-                  setErrorText("");
-                  setHoneypot("");
-                }}
-                className="min-h-10 touch-manipulation rounded-full border border-slate-800 px-4 py-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-400 transition hover:border-slate-600 hover:text-white"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={sendReport}
-                disabled={!message.trim() || status === "sending" || reportReady === false}
-                className="min-h-10 touch-manipulation rounded-full bg-gradient-to-r from-teal-400 to-emerald-500 px-5 py-2 text-xs font-bold uppercase tracking-[0.15em] text-slate-950 transition enabled:hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {status === "sending" ? "Sending…" : "Send report"}
-              </button>
-            </div>
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    setMessage("");
+                    setEmail("");
+                    setStatus("idle");
+                    setErrorText("");
+                    setHoneypot("");
+                  }}
+                  className="min-h-10 touch-manipulation rounded-full border border-slate-800 px-4 py-2 text-xs font-semibold uppercase tracking-[0.15em] text-slate-400 transition hover:border-slate-600 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!message.trim() || status === "sending"}
+                  className="min-h-10 touch-manipulation rounded-full bg-gradient-to-r from-teal-400 to-emerald-500 px-5 py-2 text-xs font-bold uppercase tracking-[0.15em] text-slate-950 transition enabled:hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {status === "sending" ? "Sending…" : "Send report"}
+                </button>
+              </div>
 
-            {status === "sent" && (
-              <p className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-[11px] leading-relaxed text-emerald-200">
-                Thanks! Your report was sent anonymously.
-              </p>
-            )}
-            {status === "error" && (
-              <p className="rounded-2xl border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-[11px] leading-relaxed text-rose-200">
-                {errorText ? `${errorText} ` : "Couldn\u2019t send right now. "}
-                {SUPPORT_EMAIL ? (
-                  <>
-                    {"You can also email "}
-                    <a className="underline" href={buildMailtoHref(SUPPORT_EMAIL, message)}>
-                      {SUPPORT_EMAIL}
-                    </a>
-                    {message.trim()
-                      ? " — your text is already filled in."
-                      : "."}
-                  </>
-                ) : (
-                  "Please try again in a moment."
-                )}
-              </p>
-            )}
+              {status === "sent" && (
+                <p className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-[11px] leading-relaxed text-emerald-200">
+                  Thanks! Your feedback has been sent.
+                </p>
+              )}
+              {status === "error" && (
+                <p className="rounded-2xl border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-[11px] leading-relaxed text-rose-200">
+                  {errorText || "Couldn’t send that just now."} Your message is still here — please
+                  try again in a moment.
+                </p>
+              )}
+            </form>
             <div className="flex items-center justify-between gap-3 border-t border-slate-800/80 pt-3">
               <button
                 type="button"

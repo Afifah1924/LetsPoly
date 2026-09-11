@@ -9,7 +9,7 @@ Interactive polyhedron construction — explore 3D solids, unfold them into 2D n
 - **Explorer** (`/`) — the main app: rotate and zoom 3D polyhedra, play the fold/unfold transition, and use the net panel (the `app/generator/components/*` pieces) to pick a solid, size the template and print it.
 - **`/explorer`** — permanent redirect to `/`, kept so older links keep working.
 - **`/home`** — the original landing page, preserved but not linked from the app.
-- **Report widget** — the floating button (bottom-right) emails anonymous bug reports / feedback to the maintainer through this app's own serverless route.
+- **Report widget** — the floating button (bottom-right) emails anonymous bug reports / feedback to the project inbox through [FormSubmit](https://formsubmit.co), straight from the browser.
 
 ## Getting Started
 
@@ -49,31 +49,33 @@ The dev/production output folders are kept separate (`next.config.ts`) so a prod
 - All controls are at least **40px** tall, and the fold slider has a 40px touch area.
 - The `?` badge next to the preview toggles a gesture cheat-sheet (it is tappable, not hover-only).
 
-## Anonymous report emails
+## Anonymous bug reports / feedback
 
-`POST /api/report` (`app/api/report/route.ts`) validates the message, silently drops honeypot spam, applies a light per-IP rate limit (5 reports / 10 minutes) and sends the email through [Resend](https://resend.com) **server-side**, so the API key is never exposed to the browser.
+The floating button (bottom-right) posts to [FormSubmit](https://formsubmit.co) **from the browser**:
 
-Environment variables — copy `.env.example` to `.env.local` for local testing and add the same keys in Vercel for production. Only the API key is required — reports go to the default project inbox unless `REPORT_TO_EMAIL` overrides it:
+```
+POST https://formsubmit.co/ajax/letspolymake@gmail.com     (JSON in, JSON out)
+```
 
-| Variable | Required | Purpose |
+No API key, no server route, no environment variables — the recipient address in that URL *is* the whole configuration (`FORM_ENDPOINT` in `app/components/SiteFooter.tsx`).
+
+| Form field | Sent as | Notes |
 | --- | --- | --- |
-| `RESEND_API_KEY` | yes | Resend API key (`re_...`) |
-| `REPORT_TO_EMAIL` | no | Overrides the default project inbox (`letspolymake@gmail.com`) |
-| `REPORT_FROM` | no | `From` header (default `LetsPoly Reports <onboarding@resend.dev>`) |
-| `NEXT_PUBLIC_SUPPORT_EMAIL` | no | Optional “email us instead” fallback (unset by default — the panel stays server-side and never opens the visitor's mail app) |
+| Feedback | `Feedback` | The textarea. Required, 3–2000 characters. |
+| Email *(optional)* | `email` + `_replyto` | Omitted entirely when left blank, so the report stays anonymous. When given, it is what "Reply" in the inbox addresses. |
+| Page | `Page` | The page the report came from. |
+| Subject | `_subject` | `Let's Poly Make — Bug / Feedback Report`. |
+| Layout | `_template: "table"` | Readable rows rather than a wall of text. |
 
-**Getting delivery working.** The recipient is already correct — the project inbox — so only two things stand between a submitted report and your inbox:
+The email address input is the only thing asked for beyond the report itself, and it is optional: leave it empty and the submission is still sent, with nothing identifying collected.
 
-1. **`RESEND_API_KEY`** in Vercel → Settings → Environment Variables (Production *and* Preview), then **Redeploy** — environment changes only apply to new deployments.
-2. **A sender Resend accepts.** Until a sending domain is verified, the sandbox sender `onboarding@resend.dev` only delivers to the address that **owns the Resend account**. So either sign up for Resend *as* `letspolymake@gmail.com`, or verify a domain and point `REPORT_FROM` at it.
+**First-time activation (one click).** The first submission makes FormSubmit email an **"Activate Form"** link to `letspolymake@gmail.com`. Until that link is clicked it answers `{"success":"false","message":"This form needs Activation…"}` and nothing is delivered — the panel shows that message rather than a false success. Click it once and every later report is emailed straight through.
 
-Until step 1 is done, `POST /api/report` answers `500 {"ok": false, "configured": false, "error": "Reports aren't connected yet — please try again later."}` and puts the technical reason in `hint`. A provider failure (`401`/`403`/`5xx`) answers `502` the same way: the visitor sees a plain "couldn't be sent", while `hint` keeps Resend's own answer plus the likely fix (invalid key, or the sandbox sender refusing to deliver outside its own account). `GET /api/report` answers `{ ok, configured, hint }` — the same shape `GET /api/hearts` uses.
+**Success is the body, not the status code.** FormSubmit answers `HTTP 200` even when it refuses a submission, so the panel only treats a report as sent when the body says `success: "true"`. Anything else (activation pending, spam filtering) is shown as an error, the visitor's text stays in the box, and the UI never claims the report went through.
 
-The panel asks `GET /api/report` the moment it is first opened, so an unconfigured site tells the visitor *before* they write anything: an amber notice appears and the send button is disabled, instead of a message failing after the fact.
+**No mail-client handoff.** Nothing opens the visitor's own mail app: the report is relayed from the page itself, so there is no `mailto:` link and no fallback that depends on which mail client someone happens to have.
 
-**No mail-client handoff.** Reports are meant to travel from our own server to the inbox, so the panel never falls back to the visitor's mail client — there is no `mailto:` link unless you explicitly opt in by setting `NEXT_PUBLIC_SUPPORT_EMAIL` to an address (it is then pre-filled with the draft and the page URL).
-
-> **Not used: Web3Forms.** Its free plan rejects server-side calls (`403 … Pro plan is required`), and posting from the browser would expose the key — which is exactly why reports are relayed through this route instead of a client-side form service.
+> **Not used: Web3Forms.** Its free plan rejects server-side calls, and posting from the browser would expose its key. FormSubmit takes no key at all, which is why it fits here.
 
 ## Anonymous hearts (shared counter)
 
@@ -144,10 +146,8 @@ counter too.
 The app is a standard Next.js project, so Vercel needs no extra configuration:
 
 1. Go to [vercel.com/new](https://vercel.com/new) and import `Afifah1924/LetsPoly` (the framework is detected automatically).
-2. Add the environment variables above to **Production** and **Preview**.
+2. Add the storage variables above (the Redis pair) to **Production** and **Preview** — bug reports need nothing here, since FormSubmit is configured in the code.
 3. Deploy — every `git push` to `main` then ships automatically, and each PR gets a preview URL.
 
-Resend sandbox note: while sending from `onboarding@resend.dev`, mail is only delivered to the Resend account owner's address. Verify a domain in Resend to send from `@yourdomain` to any recipient.
-
-> This project previously deployed to GitHub Pages through a static export. That workflow was removed because a static export cannot host server-side routes such as `/api/report`.
+> This project previously deployed to GitHub Pages through a static export. That workflow was removed because a static export cannot host server-side routes such as `/api/hearts`.
 
