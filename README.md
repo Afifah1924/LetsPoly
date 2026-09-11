@@ -60,16 +60,18 @@ Environment variables — copy `.env.example` to `.env.local` for local testing 
 | `RESEND_API_KEY` | yes | Resend API key (`re_...`) |
 | `REPORT_TO_EMAIL` | no | Overrides the default project inbox (`letspolymake@gmail.com`) |
 | `REPORT_FROM` | no | `From` header (default `LetsPoly Reports <onboarding@resend.dev>`) |
-| `NEXT_PUBLIC_SUPPORT_EMAIL` | no | Fallback address in the “or email us” link (default `letspolymake@gmail.com`; empty hides the link) |
+| `NEXT_PUBLIC_SUPPORT_EMAIL` | no | Optional “email us instead” fallback (unset by default — the panel stays server-side and never opens the visitor's mail app) |
 
 **Getting delivery working.** The recipient is already correct — the project inbox — so only two things stand between a submitted report and your inbox:
 
 1. **`RESEND_API_KEY`** in Vercel → Settings → Environment Variables (Production *and* Preview), then **Redeploy** — environment changes only apply to new deployments.
 2. **A sender Resend accepts.** Until a sending domain is verified, the sandbox sender `onboarding@resend.dev` only delivers to the address that **owns the Resend account**. So either sign up for Resend *as* `letspolymake@gmail.com`, or verify a domain and point `REPORT_FROM` at it.
 
-Until step 1 is done, `POST /api/report` answers `500 {"ok": false, "error": "Email service is not configured yet (RESEND_API_KEY is missing)."}` — the message names the variable so a misconfigured deployment is obvious from the response alone.
+Until step 1 is done, `POST /api/report` answers `500 {"ok": false, "configured": false, "error": "Reports aren't connected yet — please try again later."}` and puts the technical reason in `hint`. A provider failure (`401`/`403`/`5xx`) answers `502` the same way: the visitor sees a plain "couldn't be sent", while `hint` keeps Resend's own answer plus the likely fix (invalid key, or the sandbox sender refusing to deliver outside its own account). `GET /api/report` answers `{ ok, configured, hint }` — the same shape `GET /api/hearts` uses.
 
-No key? The report still gets through: on failure the panel shows a **pre-filled** `mailto:` link (subject, the visitor's text and the page URL), so their mail client opens ready to send to the same inbox. Hide that link entirely by setting `NEXT_PUBLIC_SUPPORT_EMAIL` to an empty value.
+The panel asks `GET /api/report` the moment it is first opened, so an unconfigured site tells the visitor *before* they write anything: an amber notice appears and the send button is disabled, instead of a message failing after the fact.
+
+**No mail-client handoff.** Reports are meant to travel from our own server to the inbox, so the panel never falls back to the visitor's mail client — there is no `mailto:` link unless you explicitly opt in by setting `NEXT_PUBLIC_SUPPORT_EMAIL` to an address (it is then pre-filled with the draft and the page URL).
 
 > **Not used: Web3Forms.** Its free plan rejects server-side calls (`403 … Pro plan is required`), and posting from the browser would expose the key — which is exactly why reports are relayed through this route instead of a client-side form service.
 

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
+// Never cached: the answer depends on the deployment's environment variables,
+// so a build-time or full-route cache could pin `configured:false` forever.
+export const dynamic = "force-dynamic";
 
 /**
  * Anonymous bug-report / feedback endpoint.
@@ -20,12 +23,44 @@ export const runtime = "nodejs";
  * Resend sandbox caveat: the default `onboarding@resend.dev` sender only
  * delivers to the address that owns the Resend account, so that account must be
  * the inbox above - otherwise verify a sending domain and set REPORT_FROM.
- * The report panel also offers a pre-filled `mailto:` fallback
- * (app/components/SiteFooter.tsx) so a report can reach the inbox by hand.
+ *
+ *   GET  /api/report -> { ok, configured, hint }
+ *   POST /api/report -> { ok, id }
+ *
+ * GET exists so the panel can say "reports are not connected yet" *before* a
+ * visitor types anything, instead of failing afterwards. Failure responses keep
+ * a visitor-friendly `error` (what the panel renders) and put the technical
+ * reason in `hint`, which names the variable/provider answer a misconfigured
+ * deployment is hiding (neither is a secret).
  */
 
 /** Shared project inbox that receives the bug reports / feedback. */
 const DEFAULT_REPORT_TO = "letspolymake@gmail.com";
+
+const SETUP_HINT =
+  "Set RESEND_API_KEY (re_...) in Vercel -> Settings -> Environment Variables for " +
+  "Production AND Preview, then REDEPLOY - env changes only apply to new deployments. " +
+  "See README -> Anonymous report emails.";
+
+/** Resend's sandbox sender may only deliver to its own account's address. */
+const SANDBOX_HINT =
+  "Resend's sandbox sender (onboarding@resend.dev) only delivers to the address that " +
+  "owns the Resend account: create the account with the inbox address, or verify a " +
+  "domain and set REPORT_FROM.";
+
+/**
+ * Configuration probe, so the panel can warn before a report is written.
+ * Mirrors `GET /api/hearts`: only the presence of the variable is reported,
+ * never its value.
+ */
+export async function GET() {
+  const configured = Boolean(process.env.RESEND_API_KEY);
+  return NextResponse.json({
+    ok: true,
+    configured,
+    ...(configured ? {} : { hint: `RESEND_API_KEY is missing. ${SETUP_HINT}` }),
+  });
+}
 
 const MAX_MESSAGE = 2000;
 const MIN_MESSAGE = 3;
@@ -97,9 +132,12 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         ok: false,
-        // Names the missing variable so a misconfigured deployment is obvious
-        // from the response body alone (the name is not a secret).
-        error: "Email service is not configured yet (RESEND_API_KEY is missing).",
+        configured: false,
+        // What the visitor sees: never the raw config detail...
+        error: "Reports aren't connected yet — please try again later.",
+        // ...which lives here instead, so a misconfigured deployment stays
+        // diagnosable from the response body alone (no secret is named).
+        hint: `RESEND_API_KEY is missing. ${SETUP_HINT}`,
       },
       { status: 500 }
     );
@@ -133,15 +171,32 @@ export async function POST(request: Request) {
 
     const data = (await res.json().catch(() => null)) as { id?: string; message?: string } | null;
     if (!res.ok) {
+      // The provider's own wording ("you can only send testing emails…") means
+      // nothing to a visitor, so it is kept in `hint` and paired with the fix.
+      const sandbox = res.status === 403 || /testing email|own email address/i.test(data?.message ?? "");
       return NextResponse.json(
-        { ok: false, error: data?.message ?? `Email provider error (${res.status}).` },
+        {
+          ok: false,
+          error: "The report couldn't be sent — please try again later.",
+          hint:
+            `Resend answered ${res.status}: ${data?.message ?? "no message"}. ` +
+            (res.status === 401
+              ? "Check that RESEND_API_KEY is a valid, non-revoked key."
+              : sandbox
+                ? SANDBOX_HINT
+                : "See README -> Anonymous report emails."),
+        },
         { status: 502 }
       );
     }
     return NextResponse.json({ ok: true, id: data?.id ?? null });
   } catch {
     return NextResponse.json(
-      { ok: false, error: "Could not reach the email provider." },
+      {
+        ok: false,
+        error: "The report couldn't be sent — please try again later.",
+        hint: "Could not reach api.resend.com from the server (network/DNS).",
+      },
       { status: 502 }
     );
   }

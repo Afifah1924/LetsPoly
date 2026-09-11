@@ -3,11 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 
 /**
- * Support address for the "email us instead" fallback in the report panel.
- * Defaults to the project inbox; set NEXT_PUBLIC_SUPPORT_EMAIL to override it
- * (an empty value hides the fallback link entirely).
+ * Optional "email us instead" fallback address for the report panel.
+ *
+ * Deliberately empty by default: the report form exists so a message goes from
+ * our own server straight to the project inbox, and bouncing a visitor into
+ * their own mail client (a third-party app on their device, with our address
+ * pre-filled) is not a substitute for that. Set NEXT_PUBLIC_SUPPORT_EMAIL to an
+ * address to bring the pre-filled `mailto:` link back.
  */
-const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "letspolymake@gmail.com";
+const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "";
 
 /** Keep in sync with the subject used in app/api/report/route.ts. */
 const REPORT_SUBJECT = "[LetsPoly] Bug report / feedback";
@@ -118,6 +122,9 @@ function ReportBugButton() {
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [errorText, setErrorText] = useState("");
+  // null = not asked yet, false = /api/report says it is not connected, so the
+  // panel says so up front instead of failing after the visitor has typed.
+  const [reportReady, setReportReady] = useState<boolean | null>(null);
   // Honeypot: invisible to humans; bots that fill it are silently ignored.
   const [honeypot, setHoneypot] = useState("");
   const [hearts, setHearts] = useState<
@@ -142,6 +149,30 @@ function ReportBugButton() {
   const [heartNote, setHeartNote] = useState("");
   // Set while this visitor's own heart may not have reached a stale GET yet.
   const gaveHeartRef = useRef(false);
+
+  // Once the panel is first opened, ask the endpoint whether reports can be
+  // delivered at all (GET /api/report reports only whether RESEND_API_KEY is
+  // present, never its value). Failing early is the whole point: a visitor must
+  // not write a report only to be handed an error - or worse, a link that opens
+  // their own mail app - at the end.
+  useEffect(() => {
+    if (!open || reportReady !== null) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/report", { cache: "no-store" });
+        const data = (await res.json().catch(() => null)) as
+          | { ok?: boolean; configured?: boolean }
+          | null;
+        if (!cancelled && data?.ok) setReportReady(data.configured !== false);
+      } catch {
+        /* unknown: the send attempt reports the real reason */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, reportReady]);
 
   // Load the shared total once, and remember whether this browser already gave
   // a heart (so a reload/second visit cannot count twice).
@@ -306,7 +337,12 @@ function ReportBugButton() {
           company: honeypot,
         }),
       });
-      const data = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
+      const data = (await res.json().catch(() => null)) as
+        | { ok?: boolean; configured?: boolean; error?: string }
+        | null;
+      // An unconfigured deployment answers configured:false; record it so the
+      // panel stops offering to send until it is fixed.
+      if (data?.configured === false) setReportReady(false);
       if (!res.ok || !data?.ok) {
         throw new Error(data?.error || `Request failed: ${res.status}`);
       }
@@ -370,6 +406,12 @@ function ReportBugButton() {
               placeholder="Describe what happened…"
               className="w-full resize-none rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3 text-base text-white placeholder-slate-500 outline-none transition focus:border-teal-400 sm:text-sm"
             />
+            {reportReady === false && (
+              <p className="rounded-2xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-[11px] leading-relaxed text-amber-200">
+                Reports aren’t connected yet — sending is off until the site is finished setting
+                this up. Thanks for your patience.
+              </p>
+            )}
             <div className="flex items-center justify-end gap-2">
               <button
                 type="button"
@@ -387,7 +429,7 @@ function ReportBugButton() {
               <button
                 type="button"
                 onClick={sendReport}
-                disabled={!message.trim() || status === "sending"}
+                disabled={!message.trim() || status === "sending" || reportReady === false}
                 className="min-h-10 touch-manipulation rounded-full bg-gradient-to-r from-teal-400 to-emerald-500 px-5 py-2 text-xs font-bold uppercase tracking-[0.15em] text-slate-950 transition enabled:hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {status === "sending" ? "Sending…" : "Send report"}
