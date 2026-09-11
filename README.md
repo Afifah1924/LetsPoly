@@ -84,17 +84,31 @@ How it stays honest without accounts:
 - The browser generates a random anonymous id (localStorage) — no personal data.
   The server records it once with `SET … NX`, so a repeat click, reload or a
   second visit returns `counted: false` and leaves the total untouched.
-- A per‑IP daily budget applies to **new** hearts only, so shared networks
-  (school/office/mobile) are not blocked and one person cannot inflate the total.
+- A per‑network **burst** budget applies to **new** hearts only. It is a short,
+  time‑bucketed window (60 new hearts per 10 minutes), so it heals on its own
+  instead of locking a whole address out — carriers, schools, offices and CGNAT
+  put thousands of genuine visitors behind one IP, and the old 25‑per‑*day* cap
+  froze the counter for everyone on such a network until midnight.
+- If the platform tells the route nothing about the caller (no
+  `x-forwarded-for` / `x-real-ip` / `cf-connecting-ip`), the network budget is
+  **skipped** rather than hashing a missing header — one shared bucket would
+  otherwise let a single budget rate‑limit the entire site. The visitor id is
+  the real guard.
+- Visitors whose browser blocks storage (Safari private browsing, “block all
+  cookies”) still get an id for the page view, so their heart is counted instead
+  of being dropped for having nothing to de‑duplicate on.
+- A heart that could not be counted is **never silently swallowed**: the panel
+  says why (burst limit / store unreachable) and the retry lock is released. The
+  total also never moves backwards if a late response arrives after a click.
 - Storage is Redis over the Upstash/Vercel KV REST API (no npm dependency).
   Env: `KV_REST_API_URL` + `KV_REST_API_TOKEN`, or the Upstash equivalents.
 
 **Setup (1 minute, free):** create a Redis database at
 [upstash.com](https://upstash.com) (or add Vercel KV to the project) and copy the
-two REST values into the Vercel environment variables, then redeploy.
-
-With no store configured the route reports `configured: false` and the UI keeps
-the older per‑browser counter, so nothing breaks.
+two REST values into the Vercel environment variables, then redeploy. Until that
+is done the shared total cannot exist: the route reports `configured: false`,
+the panel keeps a per‑browser count and **says so** (“shown on this device
+only”), so a small number is never mistaken for the site‑wide total.
 
 ## Deploy on Vercel
 

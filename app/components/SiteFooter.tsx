@@ -32,22 +32,35 @@ const HEART_GIVEN_KEY = "letspoly_heart_given";
 const LOCAL_COUNT_KEY = "letspoly_likes";
 const ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
 
+/** Random anonymous id — never derived from anything personal. */
+function randomAnonId(): string {
+  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID().replace(/-/g, "")
+    : `${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+}
+
+/** Id used when the browser refuses to store anything (this page view only). */
+let memoryAnonId = "";
+
 /**
  * Stable random id for this browser — no personal data, just something the
  * server can de-duplicate on so one visitor counts once.
+ *
+ * The id has to exist even when storage is unavailable (Safari private
+ * browsing, "block all cookies"): returning an empty string used to abandon the
+ * request, so those visitors were never counted at all. A page-view id keeps
+ * their heart in the shared total instead of silently dropping it.
  */
 function readAnonId(): string {
   try {
     const existing = window.localStorage.getItem(ANON_ID_KEY);
     if (existing && ID_PATTERN.test(existing)) return existing;
-    const created =
-      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-        ? crypto.randomUUID().replace(/-/g, "")
-        : `${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+    const created = randomAnonId();
     window.localStorage.setItem(ANON_ID_KEY, created);
     return created;
   } catch {
-    return "";
+    if (!memoryAnonId) memoryAnonId = randomAnonId();
+    return memoryAnonId;
   }
 }
 
@@ -124,6 +137,11 @@ function ReportBugButton() {
   const [shared, setShared] = useState(false);
   // One heart per visitor, remembered per browser so a reload cannot re-count.
   const [contributed, setContributed] = useState(false);
+  // Why the last heart was not counted (rate limited / store missing / down), so
+  // a rejected click never looks like nothing happened.
+  const [heartNote, setHeartNote] = useState("");
+  // Set while this visitor's own heart may not have reached a stale GET yet.
+  const gaveHeartRef = useRef(false);
 
   // Load the shared total once, and remember whether this browser already gave
   // a heart (so a reload/second visit cannot count twice).
@@ -144,9 +162,12 @@ function ReportBugButton() {
           | null;
         if (cancelled || !data?.ok || !data.configured || typeof data.count !== "number") return;
         setShared(true);
-        setHeartCount(data.count);
+        // A total that lands after this visitor's own heart must never make the
+        // counter look like it went backwards.
+        const total = data.count;
+        setHeartCount((prev) => (gaveHeartRef.current ? Math.max(prev, total) : total));
         try {
-          window.localStorage.setItem(LOCAL_COUNT_KEY, String(data.count));
+          window.localStorage.setItem(LOCAL_COUNT_KEY, String(total));
         } catch {
           /* ignore */
         }
@@ -183,6 +204,8 @@ function ReportBugButton() {
     inFlightRef.current = true;
     setContributed(true);
     setHeartCount((prev) => prev + 1); // optimistic
+    setHeartNote("");
+    gaveHeartRef.current = true;
     try {
       window.localStorage.setItem(HEART_GIVEN_KEY, "1");
     } catch {
@@ -202,8 +225,10 @@ function ReportBugButton() {
         | null;
 
       if (res.status === 503 && data?.configured === false) {
-        // No shared store configured: behave exactly like the old local counter.
+        // No shared store configured: the count can only live on this device, so
+        // say that rather than showing a number that looks global.
         setShared(false);
+        setHeartNote("Shown on this device only — the shared counter is not connected yet.");
         try {
           window.localStorage.setItem(LOCAL_COUNT_KEY, String(heartCount + 1));
         } catch {
@@ -211,21 +236,46 @@ function ReportBugButton() {
         }
         return;
       }
+
+      if (res.status === 429) {
+        // Network burst guard: the heart was not counted, so undo the optimistic
+        // bump, release the lock and tell the visitor they can retry — silently
+        // reverting is what made the counter look frozen.
+        setContributed(false);
+        gaveHeartRef.current = false;
+        setHeartCount((prev) => Math.max(0, prev - 1));
+        setHeartNote(
+          data?.error || "Lots of new hearts from this network just now — try again in a few minutes."
+        );
+        try {
+          window.localStorage.removeItem(HEART_GIVEN_KEY);
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
+
       if (!res.ok || !data?.ok || typeof data.count !== "number") {
         throw new Error(data?.error || `Request failed: ${res.status}`);
       }
 
       setShared(true);
       setHeartCount(data.count);
+      setHeartNote(
+        data.counted === false ? "You already left your heart on this device — thank you." : ""
+      );
       try {
         window.localStorage.setItem(LOCAL_COUNT_KEY, String(data.count));
       } catch {
         /* ignore */
       }
     } catch {
-      // Genuine failure (offline, store down): undo so the visitor can retry.
+      // Genuine failure (offline, store down): undo the heart, but explain it so
+      // the visitor knows the click was not swallowed.
       setContributed(false);
+      gaveHeartRef.current = false;
       setHeartCount((prev) => Math.max(0, prev - 1));
+      setHeartNote("Couldn't reach the shared counter — please try again in a moment.");
       try {
         window.localStorage.removeItem(HEART_GIVEN_KEY);
       } catch {
@@ -401,6 +451,12 @@ function ReportBugButton() {
                 {contributed ? "thanks for the love" : "anonymous love"}
               </span>
             </div>
+
+            {heartNote && (
+              <p className="rounded-2xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-[11px] leading-relaxed text-amber-200">
+                {heartNote}
+              </p>
+            )}
           </div>
         </div>
       )}
