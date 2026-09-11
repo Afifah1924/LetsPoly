@@ -41,7 +41,7 @@ const structureSections = [
  * triangular prism, which is 5/6/9). Euler's V - E + F = 2 is satisfied by
  * both, so only the geometry catches that kind of mistake.
  */
-const structureDetails: Record<string, { name: string; category: string; faces: number; edges: number; vertices: number; faceShape: string; difficulty: string; symmetry: string }> = {
+const structureDetails: Record<string, { name: string; category: string; faces: number; edges: number; vertices: number; faceShape: string; difficulty: string }> = {
   Tetrahedron: {
     name: "Tetrahedron",
     category: "Platonic Solid",
@@ -50,7 +50,6 @@ const structureDetails: Record<string, { name: string; category: string; faces: 
     vertices: 4,
     faceShape: "Triangle",
     difficulty: "Easy",
-    symmetry: "High",
   },
   Cube: {
     name: "Cube",
@@ -60,7 +59,6 @@ const structureDetails: Record<string, { name: string; category: string; faces: 
     vertices: 8,
     faceShape: "Square",
     difficulty: "Easy",
-    symmetry: "High",
   },
   Octahedron: {
     name: "Octahedron",
@@ -70,7 +68,6 @@ const structureDetails: Record<string, { name: string; category: string; faces: 
     vertices: 6,
     faceShape: "Triangle",
     difficulty: "Medium",
-    symmetry: "High",
   },
   Dodecahedron: {
     name: "Dodecahedron",
@@ -80,7 +77,6 @@ const structureDetails: Record<string, { name: string; category: string; faces: 
     vertices: 20,
     faceShape: "Pentagon",
     difficulty: "Medium",
-    symmetry: "High",
   },
   Icosahedron: {
     name: "Icosahedron",
@@ -90,7 +86,6 @@ const structureDetails: Record<string, { name: string; category: string; faces: 
     vertices: 12,
     faceShape: "Triangle",
     difficulty: "Medium",
-    symmetry: "High",
   },
   "Truncated Cube": {
     name: "Truncated Cube",
@@ -102,7 +97,6 @@ const structureDetails: Record<string, { name: string; category: string; faces: 
     // corners become triangles.
     faceShape: "Triangle + Octagon",
     difficulty: "Medium",
-    symmetry: "Medium",
   },
   "Truncated Icosahedron": {
     name: "Truncated Icosahedron",
@@ -113,7 +107,6 @@ const structureDetails: Record<string, { name: string; category: string; faces: 
     // Corner-truncated icosahedron (the football): 20 hexagons + 12 pentagons.
     faceShape: "Pentagon + Hexagon",
     difficulty: "Hard",
-    symmetry: "High",
   },
   Prism: {
     name: "Prism",
@@ -125,7 +118,6 @@ const structureDetails: Record<string, { name: string; category: string; faces: 
     vertices: 6,
     faceShape: "Triangle + Quadrilateral",
     difficulty: "Easy",
-    symmetry: "Low",
   },
   Pyramid: {
     name: "Pyramid",
@@ -136,7 +128,6 @@ const structureDetails: Record<string, { name: string; category: string; faces: 
     // Square pyramid (buildPyramidGeometry): 4 triangles on a square base.
     faceShape: "Triangle + Square",
     difficulty: "Easy",
-    symmetry: "Low",
   },
 };
 
@@ -150,7 +141,6 @@ export default function ExplorerPage() {
     { label: "Vertices", value: String(selectedStructure.vertices) },
     { label: "Edges", value: String(selectedStructure.edges) },
     { label: "Face shape", value: selectedStructure.faceShape },
-    { label: "Symmetry", value: selectedStructure.symmetry },
     { label: "Difficulty", value: selectedStructure.difficulty },
   ];
   const allShapes = structureSections.flatMap((section) => section.items);
