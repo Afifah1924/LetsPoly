@@ -23,12 +23,13 @@ export const dynamic = "force-dynamic";
  *    put thousands of genuine visitors behind one IP, so a long daily cap there
  *    silently froze the whole counter for everyone on that network.
  *
- * Env (either pair; Vercel KV / Upstash both work):
- *   KV_REST_API_URL      + KV_REST_API_TOKEN
+ * Env (either pair; Vercel KV / Upstash both work and must be complete):
+ *   KV_REST_API_URL        + KV_REST_API_TOKEN
  *   UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN
  *
- * With none configured the route reports configured:false and the UI keeps the
- * old per-browser counter (and says so), so nothing breaks.
+ * `npm run hearts:check` verifies the pair end to end. With none configured the
+ * route reports configured:false (plus a `hint` naming what is missing) and the
+ * UI keeps the old per-browser counter and says so, so nothing breaks.
  */
 
 const TOTAL_KEY = "letspoly:hearts:total";
@@ -49,10 +50,40 @@ const ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
 
 type Store = { url: string; token: string };
 
-function store(): Store | null {
-  const url = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN;
-  return url && token ? { url, token } : null;
+/**
+ * Store credentials, as complete URL/token pairs.
+ *
+ * A pair is only usable together: mixing one provider's URL with another's
+ * token (which a single `??` chain happily did) just answers 401, so a
+ * half-filled environment is reported as "not configured" together with the
+ * exact variable that is missing.
+ */
+const STORE_PAIRS: ReadonlyArray<{ url: string; token: string }> = [
+  { url: "KV_REST_API_URL", token: "KV_REST_API_TOKEN" },
+  { url: "UPSTASH_REDIS_REST_URL", token: "UPSTASH_REDIS_REST_TOKEN" },
+];
+
+const SETUP_HINT =
+  "Set KV_REST_API_URL + KV_REST_API_TOKEN (Vercel KV) or UPSTASH_REDIS_REST_URL + " +
+  "UPSTASH_REDIS_REST_TOKEN (Upstash), then redeploy — see README → Anonymous hearts, " +
+  "or run `npm run hearts:check`.";
+
+function storeConfig(): { store: Store | null; hint: string } {
+  const half: string[] = [];
+  for (const pair of STORE_PAIRS) {
+    const url = process.env[pair.url];
+    const token = process.env[pair.token];
+    if (url && token) return { store: { url, token }, hint: "" };
+    if (url && !token) half.push(`${pair.url} is set but ${pair.token} is missing`);
+    if (!url && token) half.push(`${pair.token} is set but ${pair.url} is missing`);
+  }
+  if (half.length) {
+    return {
+      store: null,
+      hint: `${half.join("; ")} — the URL and its token must come from the same store integration.`,
+    };
+  }
+  return { store: null, hint: SETUP_HINT };
 }
 
 /**
@@ -95,8 +126,8 @@ const asCount = (value: unknown) => {
 };
 
 export async function GET() {
-  const config = store();
-  if (!config) return NextResponse.json({ ok: true, configured: false, count: 0 });
+  const { store: config, hint } = storeConfig();
+  if (!config) return NextResponse.json({ ok: true, configured: false, count: 0, hint });
 
   try {
     const count = asCount(await redis(["GET", TOTAL_KEY], config));
@@ -122,10 +153,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Invalid visitor id." }, { status: 400 });
   }
 
-  const config = store();
+  const { store: config, hint } = storeConfig();
   if (!config) {
     return NextResponse.json(
-      { ok: false, configured: false, error: "Shared counter is not configured yet." },
+      { ok: false, configured: false, hint, error: "Shared counter is not configured yet." },
       { status: 503 }
     );
   }

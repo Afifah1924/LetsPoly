@@ -34,6 +34,7 @@ On Windows you can also run the helper script, which installs dependencies and s
 | `npm run build` | Production build → `.next-build` locally, `.next` on Vercel |
 | `npm start` | Serve the production build |
 | `npm run lint` | ESLint |
+| `npm run hearts:check` | Diagnose the shared heart counter (env + store + running app) |
 
 The dev/production output folders are kept separate (`next.config.ts`) so a production build can never corrupt a running dev server's `.next` cache.
 
@@ -76,7 +77,7 @@ No key? The report still gets through: on failure the panel shows a **pre-filled
 The “leave your mark” heart in the report panel is counted **globally**: every
 distinct visitor adds one, and each visitor can add only one.
 
-- `GET /api/hearts` → `{ ok, configured, count }`
+- `GET /api/hearts` → `{ ok, configured, count, hint? }`
 - `POST /api/hearts` `{ id }` → `{ ok, configured, counted, count }`
 
 How it stays honest without accounts:
@@ -103,12 +104,37 @@ How it stays honest without accounts:
 - Storage is Redis over the Upstash/Vercel KV REST API (no npm dependency).
   Env: `KV_REST_API_URL` + `KV_REST_API_TOKEN`, or the Upstash equivalents.
 
-**Setup (1 minute, free):** create a Redis database at
-[upstash.com](https://upstash.com) (or add Vercel KV to the project) and copy the
-two REST values into the Vercel environment variables, then redeploy. Until that
-is done the shared total cannot exist: the route reports `configured: false`,
-the panel keeps a per‑browser count and **says so** (“shown on this device
-only”), so a small number is never mistaken for the site‑wide total.
+### Turning counting on (1 minute, free)
+
+The shared total needs a store — without one the route cannot know about other
+visitors, and it says so (`configured: false` plus a `hint` naming what is
+missing).
+
+1. **Create a Redis database** at [upstash.com](https://upstash.com) (or add
+   Storage → Redis in Vercel). The free tier is plenty.
+2. **Copy the REST URL and the write token** from that same database. Use the
+   write token, not the read‑only one, and don’t mix a URL from one integration
+   with a token from another — both answer `401 Unauthorized`, which looks
+   exactly like “the counter is broken”.
+3. **Add them in Vercel** → Settings → Environment Variables for **Production
+   and Preview**:
+   `KV_REST_API_URL` + `KV_REST_API_TOKEN` (Vercel KV) **or**
+   `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (Upstash).
+4. **Redeploy.** Environment changes only apply to new deployments, so a push or
+   a “Redeploy” in Vercel is required; nothing changes in a running one.
+
+Verify whenever you like — the command reports the variables it can see, writes
+to the store with temporary keys (never the live total), and asks the deployed
+app what it thinks:
+
+```bash
+npm run hearts:check -- --url https://<your-site>
+```
+
+`configured=true` and a `count` that grows when you open the site on a second
+device means every visitor is being counted. For local development put the same
+two lines in `.env.local` (copy `.env.example`) so your dev server shares the
+counter too.
 
 ## Deploy on Vercel
 

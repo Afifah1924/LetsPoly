@@ -6,7 +6,8 @@
     "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "hearts:check": "node hearts-check.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.8",
