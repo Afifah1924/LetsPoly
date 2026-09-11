@@ -80,19 +80,20 @@ export default function PartialFoldStage({ selected, modelScale }: PartialFoldSt
         <PartialFoldViewer selected={selected} modelScale={modelScale} progress={progressRef} />
       </div>
 
-      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 border-t border-slate-800/80 bg-slate-950/60 px-3 pb-2.5 pt-2.5">
+      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 border-t border-slate-800/80 bg-slate-950/60 px-2.5 pb-2 pt-2 sm:gap-x-4 sm:gap-y-2 sm:px-3 sm:pb-2.5 sm:pt-2.5">
         <button
           type="button"
           onClick={() => setPlaying((v) => !v)}
           aria-label={playing ? "Pause fold animation" : "Play fold animation"}
-          className="inline-flex min-h-10 touch-manipulation items-center gap-2 rounded-full bg-teal-400 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-950 transition hover:bg-teal-300"
+          title={playing ? "Pause fold animation" : "Play fold animation"}
+          className="inline-flex min-h-10 touch-manipulation items-center gap-2 rounded-full bg-teal-400 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-950 transition hover:bg-teal-300 sm:px-4 sm:text-xs sm:tracking-[0.2em]"
         >
           <span aria-hidden>{playing ? "❚❚" : "▶"}</span>
           {playing ? "Pause" : "Play"}
         </button>
 
-        <div className="flex min-w-[220px] flex-1 items-center gap-3">
-          <span className="shrink-0 text-[10px] uppercase tracking-[0.2em] text-slate-500">3D</span>
+        <div className="flex min-w-[110px] flex-1 items-center gap-2 sm:min-w-[220px] sm:gap-3">
+          <span className="hidden shrink-0 text-[10px] uppercase tracking-[0.2em] text-slate-500 sm:inline">3D</span>
           <input
             ref={sliderRef}
             type="range"
@@ -103,15 +104,15 @@ export default function PartialFoldStage({ selected, modelScale }: PartialFoldSt
             onChange={handleSeek}
             aria-label="Fold progress"
             title="Drag to scrub through the fold"
-            className="h-10 flex-1 touch-manipulation accent-teal-400"
+            className="h-10 w-full min-w-0 flex-1 touch-manipulation accent-teal-400"
           />
-          <span className="shrink-0 text-[10px] uppercase tracking-[0.2em] text-slate-500">Flat</span>
+          <span className="hidden shrink-0 text-[10px] uppercase tracking-[0.2em] text-slate-500 sm:inline">Flat</span>
         </div>
 
         <span
           ref={statusRef}
           aria-live="polite"
-          className="inline-flex min-w-[130px] items-center justify-center rounded-full border border-teal-400/25 bg-teal-400/10 px-3 py-1 text-center text-xs font-medium uppercase tracking-[0.2em] text-teal-200"
+          className="inline-flex min-w-0 shrink-0 items-center justify-center rounded-full border border-teal-400/25 bg-teal-400/10 px-2.5 py-1 text-center text-[11px] font-medium uppercase tracking-[0.12em] text-teal-200 sm:min-w-[130px] sm:px-3 sm:text-xs sm:tracking-[0.2em]"
         >
           Partial Fold · 50%
         </span>

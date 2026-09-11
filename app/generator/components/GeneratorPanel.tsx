@@ -268,7 +268,15 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
               <div
                 ref={viewportRef}
                 className={`relative overflow-hidden rounded-[1.75rem] border border-slate-800 bg-slate-950 ${
-                  viewMode === "net" ? "min-h-[70svh]" : "aspect-square sm:aspect-[16/10]"
+                  viewMode === "net"
+                    ? "min-h-[70svh]"
+                    : viewMode === "transition"
+                      ? // Transition stacks the step pills and the fold controls inside this
+                        // box, so a square preview left the model a ~130px letterbox strip
+                        // on a phone. No aspect-square here: with a definite min-height it
+                        // also forces the width, which overflows the column.
+                        "min-h-[58svh] sm:aspect-[16/10] sm:min-h-0"
+                      : "aspect-square sm:aspect-[16/10]"
                 } ${canRotate ? "touch-none select-none" : ""}`}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
@@ -334,7 +342,9 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
                       {transitionStep === 2 && <PartialFoldStage selected={selected} modelScale={modelScale} />}
                       {transitionStep === 3 && <PolyhedronNet mode="clean" selected={selected} height={height} unit={unit} />}
                     </div>
-                    <div className="flex flex-wrap items-center justify-center gap-2 px-2 pb-3 pt-2">
+                    {/* One compact row on phones — the three stacked pills used to eat
+                        half the preview and leave the model a letterbox strip. */}
+                    <div className="flex items-stretch gap-1.5 px-2 pb-2.5 pt-2 sm:flex-wrap sm:items-center sm:justify-center sm:gap-2 sm:pb-3">
                       {[
                         { step: 1, label: "3D Model" },
                         { step: 2, label: "Partial Fold" },
@@ -342,16 +352,19 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
                       ].map((s, i) => {
                         const active = transitionStep === s.step;
                         return (
-                          <div key={s.step} className="flex items-center gap-2">
+                          <div key={s.step} className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
                             {i > 0 && <div className="hidden h-px w-6 shrink-0 bg-slate-700 sm:block" />}
                             <button
                               type="button"
                               onClick={() => setTransitionStep(s.step)}
-                              className={`min-h-10 touch-manipulation rounded-full px-4 py-2 text-xs uppercase tracking-[0.2em] transition ${
-                                active ? "bg-teal-400 text-slate-950" : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                              className={`min-h-10 w-full min-w-0 touch-manipulation rounded-full px-1 py-2 text-[11px] font-semibold transition sm:w-auto sm:px-4 sm:text-xs sm:font-normal sm:uppercase sm:tracking-[0.2em] ${
+                                active
+                                  ? "bg-teal-400 text-slate-950"
+                                  : "bg-slate-800 font-normal text-slate-300 hover:bg-slate-700"
                               }`}
                             >
-                              Step {s.step} · {s.label}
+                              <span className="hidden sm:inline">Step {s.step} · </span>
+                              {s.label}
                             </button>
                           </div>
                         );
