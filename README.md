@@ -50,6 +50,52 @@ The dev/production output folders are kept separate (`next.config.ts`) so a prod
 - All controls are at least **40px** tall, and the fold slider has a 40px touch area.
 - The `?` badge next to the preview toggles a gesture cheat-sheet (it is tappable, not hover-only).
 
+## PDF export (2D Net)
+
+The 2D Net view hands out a printable PDF built **in the browser**: no upload, no
+server route, no PDF library. The file (xref table, page tree, Helvetica and the
+vector drawing) is written byte by byte in `app/generator/components/netPdf.ts`.
+
+- **Two ways to reach it.** A small pill is pinned to the top-right of the net
+  preview — visible the moment the tab opens, and it stays put while the sheet
+  scrolls (the drawing is padded so it never starts under the pill). A labelled
+  **Download PDF** button sits next to the A4/A3 picker, where a visitor looks
+  after choosing a paper size. Both go dead — with the reason in the tooltip —
+  when the net height is 0, and the line under them says what was saved.
+- **True size, not fit-to-page.** 1 mm of panel is 1 mm of paper
+  (1 mm = 72/25.4 pt), so a sheet can be cut and folded straight from the file.
+  A net taller/wider than the chosen paper is tiled over sheets of exactly that
+  size; portrait/landscape is whichever needs fewer sheets, and the page count is
+  read from the same `planSheets` the **Print pages** line uses — so the number on
+  screen *is* the number of pages in the file.
+- **The join is exact.** Every sheet is offset by the same small shift, which
+  leaves the tiling contiguous (sheet *k*'s window still ends where *k+1*'s
+  begins) while lifting the net's first row/column off the page edge, where a
+  printer's unprintable margin would clip it. Sheets butt together edge to edge.
+- **What a sheet carries:** face fills, fold creases as dashed lines, cut lines
+  solid, glue tabs with the length of the edge they glue, and a caption block —
+  net size, face/vertex/edge counts and Euler, the edge lengths per class, a line
+  legend, the sheet number and position, and a **50 mm scale bar** to check that
+  the printer really honoured 100% (that bar is the only thing standing between a
+  correct template and a shrunken one). The caption looks for a blank corner of
+  the sheet first, so it cannot hide a crease; a net that fills its paper has no
+  blank corner at all, and then it takes whichever corner the drawing leaves most
+  open (2 of the 124 sheets the test builds).
+- **A tab's hinge is drawn as a fold.** On screen the net's outline reads as one
+  boundary; on paper a solid line there would send the scissors straight through
+  the flap. The printed sheet therefore classifies a glue tab's base edge as a
+  crease.
+- Dimension arrows stay in the on-screen technical drawing; the sheet keeps the
+  same numbers in its caption instead of spending print area on pointers.
+
+`node test-netpdf.mjs` reads the output back for all 9 solids × A4/A3 × mm/cm ×
+three heights (4500+ assertions): xref offsets landing on their object headers,
+`/Length` matching each stream, MediaBox equal to the chosen paper, ASCII-only
+bytes, escaped text, and — the one that matters — every path segment measured
+back into millimetres and matched against the edge lengths `netMeasurement`
+reports. A PDF that quietly scaled the drawing would still open in every reader,
+so that last check is the real proof of "true size".
+
 ## Bug reports / feedback
 
 The floating button (bottom-right) posts to [FormSubmit](https://formsubmit.co) **from the browser**:

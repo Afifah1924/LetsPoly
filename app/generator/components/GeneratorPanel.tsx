@@ -4,6 +4,7 @@ import { useMemo, useRef, useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import PolyhedronNet from "./PolyhedronNet";
 import { fitFromMeasurement, measureNet } from "./netMeasurement";
+import { buildNetPdf, netPdfFileName, planSheets } from "./netPdf";
 
 const PolyhedronViewer = dynamic(() => import("./PolyhedronViewer"), { ssr: false });
 const PartialFoldStage = dynamic(() => import("./PartialFoldStage"), { ssr: false });
@@ -65,6 +66,37 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
     up: (event: PointerEvent) => void;
   }>({ down: () => {}, move: () => {}, up: () => {} });
   const [helpOpen, setHelpOpen] = useState(false);
+  // Result line under the PDF button: file name on success, a plain answer on
+  // failure. Nothing is ever claimed unless a file was actually written.
+  const [pdfNote, setPdfNote] = useState("");
+
+  /**
+   * Builds the printable PDF in the browser and hands it to the download
+   * manager. Same numbers as the panel: the measured fit, the chosen unit and
+   * the chosen paper — so the sheets match what the visitor just looked at.
+   */
+  const downloadPdf = () => {
+    if (!pdfSource) return;
+    try {
+      const bytes = buildNetPdf({ selected, paper, unit, fit: pdfSource });
+      if (!bytes) throw new Error("no net to export");
+      const name = netPdfFileName(selected, pdfSource.netHeightMm, unit, paper);
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = name;
+      link.rel = "noopener";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      // Revoking in the same tick can cancel the download in some browsers, and
+      // 30 s is far longer than a download needs, so nothing leaks either.
+      window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+      setPdfNote(`Saved ${name} · ${paperPages} page${paperPages === 1 ? "" : "s"} · print at 100%`);
+    } catch {
+      setPdfNote("Could not build the PDF — please try again.");
+    }
+  };
 
   // React's onWheel is a passive listener, so preventDefault silently fails.
   // Attach a native, non-passive listener so "scroll to zoom" doesn't also scroll the page.
@@ -100,18 +132,22 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
   const widthMismatch =
     requestedWidthMm > 0 && fit && Math.abs(requestedWidthMm - fit.netWidthMm) > 0.5;
 
-  // Paper tiling for printing the fitted net.
+  // Paper tiling for printing the fitted net. The count comes from the same
+  // function the PDF export tiles with, so what is shown here is the page count
+  // of the file the button hands over, not a separate estimate.
   const paperDims = paper === "A4" ? { w: 210, h: 297 } : { w: 297, h: 420 };
-  const paperPages = fit
-    ? Math.max(
-        1,
-        Math.min(
-          Math.ceil(fit.netWidthMm / paperDims.w) * Math.ceil(height / paperDims.h),
-          Math.ceil(fit.netWidthMm / paperDims.h) * Math.ceil(height / paperDims.w)
-        )
-      )
-    : 0;
+  const sheets = fit ? planSheets(fit.netWidthMm, fit.netHeightMm, paper) : null;
+  const paperPages = sheets ? sheets.pages : 0;
   const modelScale = useMemo(() => Math.min(1.6, 0.8 + height / 180), [height]);
+  // A PDF needs real geometry: no net height (or an unmeasurable solid) means no file.
+  const canExportPdf = !!fit && !!measurement;
+  /**
+   * The measured fit, read out into a plain object here rather than inside the
+   * click handler below. React's compiler refuses to keep a manual `useMemo`
+   * (`fit`) alive when a nested function touches it, and this component has no
+   * other reason to give that memoization up.
+   */
+  const pdfSource = fit ? { ...fit } : null;
 
   /** The surface only captures gestures while a rotatable 3D view is showing. */
   const canRotate = viewMode === "3d" || (viewMode === "transition" && transitionStep === 1);
@@ -494,9 +530,47 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
                 )}
 
                 {viewMode === "net" && (
-                  <div className="absolute inset-0 overflow-auto overscroll-contain p-4 sm:p-6">
-<PolyhedronNet selected={selected} height={height} unit={unit} />
+                  // pt-16 keeps the pinned PDF button off the drawing: the net
+                  // scrolls underneath it instead of under the button.
+                  <div className="absolute inset-0 overflow-auto overscroll-contain p-4 pt-16 sm:p-6 sm:pt-16">
+                    <PolyhedronNet selected={selected} height={height} unit={unit} />
                   </div>
+                )}
+
+                {/* Pinned to the preview frame, so it is on screen the instant the
+                    net appears and stays there while the sheet scrolls. Two
+                    separate conditions rather than a fragment: the React Compiler
+                    drops manual memoization in this component when a fragment
+                    wraps this view. */}
+                {viewMode === "net" && (
+                  <button
+                    type="button"
+                    onClick={downloadPdf}
+                    disabled={!canExportPdf}
+                    aria-label={`Download the ${selected} net as a printable PDF`}
+                    title={
+                      canExportPdf
+                        ? `Download PDF · ${paper} · ${paperPages} page${paperPages === 1 ? "" : "s"} · true size`
+                        : "Enter a net height above 0 first"
+                    }
+                    className="absolute right-3 top-3 z-20 inline-flex min-h-10 touch-manipulation items-center gap-2 rounded-full border border-teal-400/60 bg-slate-950/95 px-3.5 text-xs font-semibold uppercase tracking-[0.16em] text-teal-200 shadow-lg shadow-slate-950/60 transition hover:border-teal-300 hover:bg-teal-400/10 hover:text-white disabled:cursor-not-allowed disabled:border-slate-700 disabled:text-slate-500 disabled:hover:bg-slate-950/95"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M12 4v10" />
+                      <path d="M7.5 9.5 12 14l4.5-4.5" />
+                      <path d="M5 18.5h14" />
+                    </svg>
+                    PDF
+                  </button>
                 )}
               </div>
             </div>
@@ -596,23 +670,57 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
                     </span>
                   </p>
                 </div>
-                <div className="flex overflow-hidden rounded-full border border-slate-800">
-                  {(["A4", "A3"] as const).map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => setPaper(p)}
-                      className={`min-h-10 touch-manipulation px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition ${
-                        paper === p
-                          ? "bg-teal-400 text-slate-950"
-                          : "bg-slate-950 text-slate-400 hover:text-white"
-                      }`}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex overflow-hidden rounded-full border border-slate-800">
+                    {(["A4", "A3"] as const).map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setPaper(p)}
+                        className={`min-h-10 touch-manipulation px-5 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition ${
+                          paper === p
+                            ? "bg-teal-400 text-slate-950"
+                            : "bg-slate-950 text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Second entry point to the same export, next to the paper the
+                      file is built for — this is where the visitor looks after
+                      picking a size. */}
+                  <button
+                    type="button"
+                    onClick={downloadPdf}
+                    disabled={!canExportPdf}
+                    aria-label={`Download the ${selected} net as a printable PDF`}
+                    className="inline-flex min-h-10 touch-manipulation items-center gap-2 rounded-full bg-teal-400 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-950 transition hover:bg-teal-300 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-500"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
                     >
-                      {p}
-                    </button>
-                  ))}
+                      <path d="M12 4v10" />
+                      <path d="M7.5 9.5 12 14l4.5-4.5" />
+                      <path d="M5 18.5h14" />
+                    </svg>
+                    Download PDF
+                  </button>
                 </div>
               </div>
+
+              {pdfNote && (
+                <p role="status" className="mt-4 text-xs leading-relaxed text-teal-200">
+                  {pdfNote}
+                </p>
+              )}
 
               {widthMismatch && fit && (
                 <p className="mt-4 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-xs leading-relaxed text-amber-200">
