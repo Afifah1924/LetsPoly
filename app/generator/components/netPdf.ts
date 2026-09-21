@@ -513,7 +513,14 @@ type CaptionRow = { text: string; size: number; bold?: boolean; color?: Rgb };
 /** Strips the trailing zeros off a formatted number ("120.0" -> "120", "12.50" -> "12.5"). */
 const trim = (value: string) => (value.includes(".") ? value.replace(/0+$/, "").replace(/\.$/, "") : value);
 
-/** A length in the visitor's unit: mm to at most one decimal, cm to two. */
+/**
+ * A length in the visitor's unit — mm to at most one decimal, cm to two.
+ *
+ * This is the only place a length becomes display text: the panel's rows and the
+ * printed sheet's caption both call it, so the screen and the paper can never
+ * disagree about the unit or the digits. The value handed in is always the
+ * internal millimetre one; nothing is rounded before it gets here.
+ */
 export function fmtLength(mm: number, unit: Unit): string {
   if (!Number.isFinite(mm)) return "-";
   return unit === "cm" ? `${trim((mm / 10).toFixed(2))} cm` : `${trim(mm.toFixed(1))} mm`;

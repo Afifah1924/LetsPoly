@@ -4,18 +4,45 @@ import { useMemo, useRef, useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import PolyhedronNet from "./PolyhedronNet";
 import { fitFromMeasurement, measureNet } from "./netMeasurement";
-import { buildNetPdf, netPdfFileName, planSheets } from "./netPdf";
+import { buildNetPdf, fmtLength, netPdfFileName, planSheets } from "./netPdf";
 
 const PolyhedronViewer = dynamic(() => import("./PolyhedronViewer"), { ssr: false });
 const PartialFoldStage = dynamic(() => import("./PartialFoldStage"), { ssr: false });
 
-/** Format mm for display only; internal calculations keep full precision. */
-const fmtMm = (mm: number) => {
-  if (!Number.isFinite(mm)) return "—";
-  return Math.abs(mm - Math.round(mm)) < 0.05 ? String(Math.round(mm)) : mm.toFixed(1);
-};
+/**
+ * Printer glyph for the export buttons.
+ *
+ * Hand-drawn like the rest of the app's icons: nothing here pulls in an icon
+ * package, and the paths use `currentColor` so the button's own text colour
+ * drives it. `stroke-linecap`/`linejoin` come from the wrapper classes.
+ */
+function PrintIcon({ className }: { className: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {/* sheet going in, the body, and the tray coming out */}
+      <path d="M7 9V4h10v5" />
+      <path d="M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2" />
+      <path d="M7 14h10v6H7z" />
+    </svg>
+  );
+}
 
-/** Format the height input value for the active unit (used by the text field). */
+/**
+ * Format the height input value for the active unit (used by the text field).
+ *
+ * Display lengths use `fmtLength` from `./netPdf`, the same function the printed
+ * sheet's caption uses; this one is only about what the *input field* holds, and
+ * keeps cm entries at one decimal like a tape measure.
+ */
 const formatHeightInput = (mm: number, unit: "mm" | "cm") =>
   unit === "cm" ? (mm / 10).toFixed(1) : String(Math.round(mm * 10) / 10);
 
@@ -66,7 +93,7 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
     up: (event: PointerEvent) => void;
   }>({ down: () => {}, move: () => {}, up: () => {} });
   const [helpOpen, setHelpOpen] = useState(false);
-  // Result line under the PDF button: file name on success, a plain answer on
+  // Result line under the print button: file name on success, a plain answer on
   // failure. Nothing is ever claimed unless a file was actually written.
   const [pdfNote, setPdfNote] = useState("");
 
@@ -530,7 +557,7 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
                 )}
 
                 {viewMode === "net" && (
-                  // pt-16 keeps the pinned PDF button off the drawing: the net
+                  // pt-16 keeps the pinned print button off the drawing: the net
                   // scrolls underneath it instead of under the button.
                   <div className="absolute inset-0 overflow-auto overscroll-contain p-4 pt-16 sm:p-6 sm:pt-16">
                     <PolyhedronNet selected={selected} height={height} unit={unit} />
@@ -547,29 +574,15 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
                     type="button"
                     onClick={downloadPdf}
                     disabled={!canExportPdf}
-                    aria-label={`Download the ${selected} net as a printable PDF`}
+                    aria-label="Print / Export PDF"
                     title={
                       canExportPdf
-                        ? `Download PDF · ${paper} · ${paperPages} page${paperPages === 1 ? "" : "s"} · true size`
+                        ? `Print / Export PDF · ${paper} · ${paperPages} page${paperPages === 1 ? "" : "s"} · true size`
                         : "Enter a net height above 0 first"
                     }
-                    className="absolute right-3 top-3 z-20 inline-flex min-h-10 touch-manipulation items-center gap-2 rounded-full border border-teal-400/60 bg-slate-950/95 px-3.5 text-xs font-semibold uppercase tracking-[0.16em] text-teal-200 shadow-lg shadow-slate-950/60 transition hover:border-teal-300 hover:bg-teal-400/10 hover:text-white disabled:cursor-not-allowed disabled:border-slate-700 disabled:text-slate-500 disabled:hover:bg-slate-950/95"
+                    className="absolute right-3 top-3 z-20 grid h-10 w-10 touch-manipulation place-items-center rounded-full border border-teal-400/60 bg-slate-950/95 text-teal-200 shadow-lg shadow-slate-950/60 transition hover:border-teal-300 hover:bg-teal-400/10 hover:text-white disabled:cursor-not-allowed disabled:border-slate-700 disabled:text-slate-500 disabled:hover:bg-slate-950/95"
                   >
-                    <svg
-                      viewBox="0 0 24 24"
-                      className="h-4 w-4"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M12 4v10" />
-                      <path d="M7.5 9.5 12 14l4.5-4.5" />
-                      <path d="M5 18.5h14" />
-                    </svg>
-                    PDF
+                    <PrintIcon className="h-5 w-5" />
                   </button>
                 )}
               </div>
@@ -635,15 +648,15 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
             <div className="mt-6 rounded-[1.75rem] border border-slate-800 bg-slate-950/80 p-6 text-sm text-slate-300">
               <div>
                 {[
-                  { label: "Net height", value: `${fmtMm(height)} mm` },
-                  { label: "Net width", value: fit ? `${fmtMm(fit.netWidthMm)} mm` : "—" },
+                  { label: "Net height", value: fmtLength(height, unit) },
+                  { label: "Net width", value: fit ? fmtLength(fit.netWidthMm, unit) : "—" },
                   ...(fit?.edgeRows.map((e) => ({
                     label: e.count > 0 ? `${e.label} (×${e.count})` : e.label,
-                    value: `${fmtMm(e.mm)} mm`,
+                    value: fmtLength(e.mm, unit),
                   })) ?? []),
                   {
                     label: "Net sheet size",
-                    value: fit ? `${fmtMm(fit.netWidthMm)} × ${fmtMm(height)} mm` : "—",
+                    value: fit ? `${fmtLength(fit.netWidthMm, unit)} × ${fmtLength(height, unit)}` : "—",
                   },
                 ].map((row, i, arr) => (
                   <div
@@ -662,8 +675,8 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
                 <div>
                   <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Print pages</p>
                   <p className="mt-1 text-slate-400">
-                    Tile the {fmtMm(fit?.netWidthMm ?? 0)} × {fmtMm(height)} mm net onto {paper} (
-                    {paperDims.w} × {paperDims.h} mm){" "}
+                    Tile the {fmtLength(fit?.netWidthMm ?? 0, unit)} × {fmtLength(height, unit)} net onto {paper} (
+                    {fmtLength(paperDims.w, unit)} × {fmtLength(paperDims.h, unit)}){" "}
                     <span className="whitespace-nowrap">
                       → <span className="font-medium text-white">{paperPages}</span> page
                       {paperPages === 1 ? "" : "s"}
@@ -687,31 +700,22 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
                       </button>
                     ))}
                   </div>
-                  {/* Second entry point to the same export, next to the paper the
-                      file is built for — this is where the visitor looks after
-                      picking a size. */}
+                  {/* The primary action: the printer icon, sized like every other
+                      control (40 px) so it is an easy thumb target next to the
+                      paper pills. */}
                   <button
                     type="button"
                     onClick={downloadPdf}
                     disabled={!canExportPdf}
-                    aria-label={`Download the ${selected} net as a printable PDF`}
-                    className="inline-flex min-h-10 touch-manipulation items-center gap-2 rounded-full bg-teal-400 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-950 transition hover:bg-teal-300 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-500"
+                    aria-label="Print / Export PDF"
+                    title={
+                      canExportPdf
+                        ? `Print / Export PDF · ${paper} · ${paperPages} page${paperPages === 1 ? "" : "s"}`
+                        : "Enter a net height above 0 first"
+                    }
+                    className="grid h-10 w-10 touch-manipulation place-items-center rounded-full bg-teal-400 text-slate-950 transition hover:bg-teal-300 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-500"
                   >
-                    <svg
-                      viewBox="0 0 24 24"
-                      className="h-4 w-4"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M12 4v10" />
-                      <path d="M7.5 9.5 12 14l4.5-4.5" />
-                      <path d="M5 18.5h14" />
-                    </svg>
-                    Download PDF
+                    <PrintIcon className="h-5 w-5" />
                   </button>
                 </div>
               </div>
@@ -724,10 +728,10 @@ export default function GeneratorPanel({ selected, initialHeight }: GeneratorPan
 
               {widthMismatch && fit && (
                 <p className="mt-4 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-xs leading-relaxed text-amber-200">
-                  Requested width {fmtMm(requestedWidthMm)} mm cannot be met by a single uniform
-                  scale together with a {fmtMm(height)} mm net height (this net has a fixed aspect
+                  Requested width {fmtLength(requestedWidthMm, unit)} cannot be met by a single uniform
+                  scale together with a {fmtLength(height, unit)} net height (this net has a fixed aspect
                   ratio of ≈{netAspect.toFixed(3)}). Fitting the height yields a net width of{" "}
-                  {fmtMm(fit.netWidthMm)} mm — set the width to that value (or choose auto) to keep
+                  {fmtLength(fit.netWidthMm, unit)} — set the width to that value (or choose auto) to keep
                   the geometry undistorted.
                 </p>
               )}

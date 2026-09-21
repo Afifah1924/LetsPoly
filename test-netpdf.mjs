@@ -223,6 +223,8 @@ function captionBoxMm(content) {
 let pdfPages = 0;
 let pdfBytes = 0;
 let crowdedCaptions = 0;
+/** Per case, the geometry each unit drew — compared at the end. */
+const signatures = new Map();
 
 for (const shape of SHAPES) {
   const measurement = measureNet(shape);
@@ -281,6 +283,8 @@ for (const shape of SHAPES) {
           Math.min(PAPER_MM[paper].w, PAPER_MM[paper].h),
           Math.max(PAPER_MM[paper].w, PAPER_MM[paper].h),
         ];
+        // mm and cm must draw the same net: only the labels may differ.
+        const signature = [];
 
         for (const [index, page] of pages.entries()) {
           const sheet = `${label} | sheet ${index + 1}/${pages.length}`;
@@ -331,6 +335,10 @@ for (const shape of SHAPES) {
             Math.abs(bbox.w - expected.bbox.w) < 0.05 && Math.abs(bbox.h - expected.bbox.h) < 0.05,
             `${sheet}: drawn ${bbox.w.toFixed(2)}x${bbox.h.toFixed(2)} mm, expected ${expected.bbox.w.toFixed(2)}x${expected.bbox.h.toFixed(2)}`
           );
+          signature.push(
+            `${page.wPt.toFixed(2)}x${page.hPt.toFixed(2)} ${bbox.w.toFixed(2)}x${bbox.h.toFixed(2)} ` +
+              lengths.map((l) => l.toFixed(2)).sort().join(",")
+          );
 
           const wrong = lengths.filter((len) => nearest(len, expected.lengths) > 0.05);
           ok(
@@ -348,14 +356,33 @@ for (const shape of SHAPES) {
           ok(caption.every((t) => /^[\x20-\x7e]*$/.test(t)), `${sheet}: caption text is printable ASCII`);
         }
 
+        // The file name has to carry the value in the unit it is labelled with:
+        // 120 mm is "120mm", and the same net in cm is "12cm" - never "120cm".
         const name = netPdfFileName(shape, height, unit, paper);
         ok(
           /^LetsPoly-[a-z0-9-]+-net-[\d.]+(mm|cm)-(A4|A3)\.pdf$/.test(name),
           `${label}: file name is web-safe (${name})`
         );
+        const raw = unit === "cm" ? (height / 10).toFixed(2) : height.toFixed(1);
+        const shown = raw.includes(".") ? raw.replace(/0+$/, "").replace(/\.$/, "") : raw;
+        ok(
+          name.includes(`-net-${shown}${unit}-`),
+          `${label}: file name says ${shown}${unit} (${name})`
+        );
+
+        const caseKey = `${shape} | ${paper} | ${height}mm`;
+        const byUnit = signatures.get(caseKey) ?? {};
+        byUnit[unit] = signature.join(" ; ");
+        signatures.set(caseKey, byUnit);
       }
     }
   }
+}
+
+// Requirement: switching mm <-> cm must not move a single line — only relabel it.
+for (const [caseKey, byUnit] of signatures) {
+  if (!byUnit.mm || !byUnit.cm) continue;
+  ok(byUnit.mm === byUnit.cm, `${caseKey}: mm and cm draw byte-identical geometry`);
 }
 
 console.log(`checked ${checks} assertions across ${SHAPES.length} solids`);

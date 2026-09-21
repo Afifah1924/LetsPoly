@@ -56,12 +56,22 @@ The 2D Net view hands out a printable PDF built **in the browser**: no upload, n
 server route, no PDF library. The file (xref table, page tree, Helvetica and the
 vector drawing) is written byte by byte in `app/generator/components/netPdf.ts`.
 
-- **Two ways to reach it.** A small pill is pinned to the top-right of the net
-  preview — visible the moment the tab opens, and it stays put while the sheet
-  scrolls (the drawing is padded so it never starts under the pill). A labelled
-  **Download PDF** button sits next to the A4/A3 picker, where a visitor looks
-  after choosing a paper size. Both go dead — with the reason in the tooltip —
-  when the net height is 0, and the line under them says what was saved.
+- **Two ways to reach it, both a printer icon.** A 40 px printer button is pinned
+  to the top-right of the net preview — visible the moment the tab opens, and it
+  stays put while the sheet scrolls (the drawing is padded so it never starts
+  under it). A second one sits next to the A4/A3 picker, where a visitor looks
+  after choosing a paper size, and it is the primary action of that row. Both
+  carry `aria-label="Print / Export PDF"`, go dead with the reason in the tooltip
+  while the net height is 0, and the line under them names what was saved.
+- **One unit everywhere.** The measurement rows, the tiling sentence and every
+  sheet's caption read in the unit the visitor picked: `fmtLength` in `netPdf.ts`
+  is the only place a length becomes text, so the screen and the paper cannot
+  disagree. A 120 mm net shows as "Net height 120 mm" and as "12 cm" the moment
+  cm is selected — the same for the paper, "A4 (21 × 29.7 cm)", and the file
+  name, `LetsPoly-cube-net-12cm-A4.pdf`. Only the labels change: the drawing, the
+  physical size and the page count are identical in both units, which
+  `test-netpdf.mjs` asserts by comparing every path coordinate of the mm and cm
+  builds of the same net.
 - **True size, not fit-to-page.** 1 mm of panel is 1 mm of paper
   (1 mm = 72/25.4 pt), so a sheet can be cut and folded straight from the file.
   A net taller/wider than the chosen paper is tiled over sheets of exactly that
@@ -89,12 +99,14 @@ vector drawing) is written byte by byte in `app/generator/components/netPdf.ts`.
   same numbers in its caption instead of spending print area on pointers.
 
 `node test-netpdf.mjs` reads the output back for all 9 solids × A4/A3 × mm/cm ×
-three heights (4500+ assertions): xref offsets landing on their object headers,
+three heights (~5000 assertions): xref offsets landing on their object headers,
 `/Length` matching each stream, MediaBox equal to the chosen paper, ASCII-only
-bytes, escaped text, and — the one that matters — every path segment measured
-back into millimetres and matched against the edge lengths `netMeasurement`
-reports. A PDF that quietly scaled the drawing would still open in every reader,
-so that last check is the real proof of "true size".
+bytes, escaped text, file names whose value matches their unit, and — the one
+that matters — every path segment measured back into millimetres and matched
+against the edge lengths `netMeasurement` reports. A PDF that quietly scaled the
+drawing would still open in every reader, so that last check is the real proof of
+"true size"; the same loop also confirms that the mm and cm builds of one net are
+byte-identical in every coordinate, so a unit switch can only ever relabel.
 
 ## Bug reports / feedback
 
