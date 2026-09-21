@@ -53,6 +53,32 @@ canvas {
   display: none;
 }
 
+/*
+ * Analytics consent banner: rises once from the bottom edge. The whole page can
+ * be used without answering the banner, so nothing is allowed to move for a
+ * visitor who asked for no motion.
+ */
+@keyframes consent-rise {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.consent-rise {
+  animation: consent-rise 320ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .consent-rise {
+    animation: none;
+  }
+}
+
 /* Anonymous "show some love" heart burst (report panel). */
 @keyframes heart-float {
   0% {

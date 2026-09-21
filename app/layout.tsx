@@ -1,6 +1,16 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Space_Grotesk } from "next/font/google";
+import AnalyticsConsent from "./components/AnalyticsConsent";
 import "./globals.css";
+
+/**
+ * Google Analytics 4 measurement ID (`G-XXXXXXXXXX`).
+ *
+ * Analytics is completely off while this is unset, so a fresh checkout, a local
+ * dev server and preview builds stay tag-free until the variable is configured
+ * - see README -> Analytics (Google Analytics 4).
+ */
+const gaId = process.env.NEXT_PUBLIC_GA_ID?.trim() ?? "";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -44,7 +54,15 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${spaceGrotesk.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        {/*
+          Rendered client-side only, and only when a measurement ID exists:
+          the GA tag must never be in the server HTML, because it may only run
+          after the visitor consents.
+        */}
+        {gaId ? <AnalyticsConsent gaId={gaId} /> : null}
+      </body>
     </html>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ANALYTICS_SETTINGS_EVENT } from "./AnalyticsConsent";
 
 /**
  * Bug reports / feedback go straight to the project inbox through FormSubmit - a
@@ -22,6 +23,27 @@ const ANON_ID_KEY = "letspoly_anon_id";
 const HEART_GIVEN_KEY = "letspoly_heart_given";
 const LOCAL_COUNT_KEY = "letspoly_likes";
 const ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
+
+/**
+ * Analytics is only configured once the GA measurement ID exists, so the
+ * consent control is only offered when there is actually something to consent
+ * to - a re-open button that did nothing would be worse than none.
+ *
+ * `NEXT_PUBLIC_*` variables are inlined into the client bundle at build time, so
+ * the same value the root layout reads is available here. See `./AnalyticsConsent`.
+ */
+const ANALYTICS_ENABLED = Boolean(process.env.NEXT_PUBLIC_GA_ID?.trim());
+
+/**
+ * Re-opens the analytics consent banner.
+ *
+ * Withdrawing consent has to be as easy as giving it, and the banner is rendered
+ * by the root layout, so the footer just announces the request as a DOM event
+ * that `AnalyticsConsent` listens for.
+ */
+function reopenAnalyticsSettings() {
+  window.dispatchEvent(new Event(ANALYTICS_SETTINGS_EVENT));
+}
 
 /** Random anonymous id — never derived from anything personal. */
 function randomAnonId(): string {
@@ -537,6 +559,15 @@ export default function SiteFooter() {
           </div>
 
           <div className="text-center sm:text-right">
+            {ANALYTICS_ENABLED && (
+              <button
+                type="button"
+                onClick={reopenAnalyticsSettings}
+                className="mb-1 inline-flex min-h-10 touch-manipulation items-center rounded-full px-3.5 py-1.5 text-[11px] font-semibold text-slate-500 underline decoration-slate-700 underline-offset-4 transition hover:text-teal-200 hover:decoration-teal-400"
+              >
+                Analytics settings
+              </button>
+            )}
             <p className="text-[11px] uppercase tracking-[0.2em] text-slate-600">
               © 2026 LetsPoly · All rights reserved
             </p>

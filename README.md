@@ -10,6 +10,7 @@ Interactive polyhedron construction — explore 3D solids, unfold them into 2D n
 - **`/explorer`** — permanent redirect to `/`, kept so older links keep working.
 - **`/home`** — the original landing page, preserved but not linked from the app.
 - **Report widget** — the floating button (bottom-right) emails bug reports / feedback to the project inbox through [FormSubmit](https://formsubmit.co), straight from the browser.
+- **Analytics** — Google Analytics 4 page views, read on a separate dashboard, behind a consent banner (`app/components/AnalyticsConsent.tsx`); see [Analytics](#analytics-google-analytics-4).
 
 ## Getting Started
 
@@ -141,12 +142,68 @@ device means every visitor is being counted. For local development put the same
 two lines in `.env.local` (copy `.env.example`) so your dev server shares the
 counter too.
 
+## Analytics (Google Analytics 4)
+
+Visits are collected by Google Analytics 4 and read at
+**[analytics.google.com](https://analytics.google.com)** — a separate site from
+LetsPoly, so nothing has to be added to the app to view the numbers.
+
+**Consent comes first.** GA4 sets cookies, so under GDPR/ePrivacy it may only run
+*after* the visitor agrees. `app/components/AnalyticsConsent.tsx` renders a bottom
+banner, and `<GoogleAnalytics />` is mounted **only** once the answer is "Accept":
+
+- **The tag is never in the server-rendered HTML.** The root layout only passes
+  the measurement ID down, so nothing is requested from Google until the visitor
+  chooses. Declining loads no `gtag.js` and sets no cookies — the strictest form
+  of Google's Consent Mode ("basic" blocking), which is why no extra
+  `gtag('consent', 'default', …)` call is needed.
+- **The answer is remembered** (`localStorage` → `letspoly_analytics_consent`), so
+  the banner is asked once. Safari private browsing / "block all cookies" falls
+  back to an in-memory answer rather than re-asking on every click.
+- **"Analytics settings" in the footer re-opens the banner**, because withdrawing
+  consent has to be as easy as giving it. Withdrawing after the tag has run
+  deletes the `_ga*` cookies and reloads the page: `gtag.js` has no unload API, so
+  a fresh page is the only way to actually stop it.
+- The banner renders at `z-[70]`, above the floating report button, until it is
+  answered — it is not modal, so the page underneath stays usable either way.
+
+### Turning it on (2 minutes, free)
+
+1. Create a GA4 property at [analytics.google.com](https://analytics.google.com):
+   **Admin → Data streams → Add stream → Web**, pointed at your site's URL.
+2. Copy the **Measurement ID** of that stream (it starts with `G-`, e.g.
+   `G-ABC123XYZ`).
+3. Add it in Vercel → Settings → Environment Variables for **Production and
+   Preview**: `NEXT_PUBLIC_GA_ID` = `G-ABC123XYZ`.
+4. **Redeploy.** Environment changes only apply to new deployments, so a push or
+   a "Redeploy" in Vercel is required.
+
+While `NEXT_PUBLIC_GA_ID` is unset there is no banner and no tag at all, so a
+fresh checkout stays completely tag-free. To keep local dev traffic out of the
+real numbers, leave the variable out of `.env.local` — if you do set it there,
+the dev server counts too.
+
+**Checking it works:** GA4's **Realtime** report fills in within seconds of an
+accepted banner; the standard reports settle over the next 24–48h. To watch the
+tag fire, add `debugMode` to the `<GoogleAnalytics>` call in
+`AnalyticsConsent.tsx` and open the
+[DebugView](https://support.google.com/analytics/answer/7201382).
+
+> **Privacy note:** GA4 is a third-party service that sets cookies. If you take
+> EU/UK visitors, add a short privacy page saying that Google Analytics is used
+> and what for — the consent banner covers the "ask first" half of that
+> requirement, not the "say what you do with it" half.
+
+Not included: **Core Web Vitals**. Next.js can forward them to GA4 with
+`useReportWebVitals` (see `node_modules/next/dist/docs/01-app/02-guides/analytics.md`)
+if you want performance numbers next to the traffic ones.
+
 ## Deploy on Vercel
 
 The app is a standard Next.js project, so Vercel needs no extra configuration:
 
 1. Go to [vercel.com/new](https://vercel.com/new) and import `Afifah1924/LetsPoly` (the framework is detected automatically).
-2. Add the storage variables above (the Redis pair) to **Production** and **Preview** — bug reports need nothing here, since FormSubmit is configured in the code.
+2. Add the storage variables above (the Redis pair) to **Production** and **Preview**, plus `NEXT_PUBLIC_GA_ID` if you want the analytics dashboard — bug reports need nothing here, since FormSubmit is configured in the code.
 3. Deploy — every `git push` to `main` then ships automatically, and each PR gets a preview URL.
 
 > This project previously deployed to GitHub Pages through a static export. That workflow was removed because a static export cannot host server-side routes such as `/api/hearts`.
